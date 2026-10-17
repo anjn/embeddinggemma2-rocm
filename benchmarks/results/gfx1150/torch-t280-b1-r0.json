@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.17.0-1032-oem-x86_64-with-glibc2.39",
+    "numpy": "2.5.4",
+    "pillow": "13.0.0"
+  },
+  "backend": "torch",
+  "budget": 280,
+  "batch": 1,
+  "input_size": [
+    512,
+    288
+  ],
+  "input_sha256": "9b36a6e72d7989f2b0f6f79d5305b512bd955fcd73d71499fe148cca0135b36f",
+  "scope": "Direct in-process CPU uint8 RGB to CPU normalized float32 embeddings; includes preprocessing and transfers; excludes fixture generation/prescale, file IO, load, compile and warmup",
+  "warmup": 3,
+  "repeat": 5,
+  "status": "ok",
+  "seconds": [
+    0.37162972398800775,
+    0.3728215890005231,
+    0.37530257902108133,
+    0.3704023409518413,
+    0.3762792510096915
+  ],
+  "median_ms_per_image": 372.8215890005231,
+  "images_per_second": 2.6822481033913435,
+  "metadata": {
+    "torch": "2.14.1+rocm7.2",
+    "rocm": "7.2.53211",
+    "gpu": "AMD Radeon 890M",
+    "dtype": "bf16",
+    "parameter_dtype": "bf16",
+    "autocast_dtype": null,
+    "attention": "sdpa",
+    "text_attention": "eager",
+    "model_revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+    "actual_sequence_length": 268,
+    "actual_image_tokens": 264
+  },
+  "runner_id": "torch",
+  "round": 0,
+  "wall_seconds": 12.347252130508423
+}

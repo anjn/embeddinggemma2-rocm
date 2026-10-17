@@ -1,0 +1,9 @@
+# Build the main Dockerfile first; this optional image adds baseline build tools.
+ARG EG2_BASE=embeddinggemma2-rocm:local
+FROM ${EG2_BASE}
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    hipblas-dev rocblas-dev libvulkan-dev glslc \
+    && rm -rf /var/lib/apt/lists/*
+ENTRYPOINT []
+CMD ["bash"]

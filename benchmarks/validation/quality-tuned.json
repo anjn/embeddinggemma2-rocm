@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "bundle_sha256": "35a9f2b7037bc6ad7ea28a4ab4e83706e33a565dc438be400aedac8598480b7f",
+  "input_sha256": "62f0a0c9c7ef269a52ee440c48ee2a0d3f37facbd01761bf08d6874ff4ea5d02",
+  "manifest_sha256": "3d3aced14affedefb32c3a15387335c82f779352a4fa34cb232081035c5f2c6c",
+  "images": 256,
+  "captions": 1280,
+  "budget": 70,
+  "requested_batch": 4,
+  "image_execution": {
+    "budget": 70,
+    "chunks": 1,
+    "execution_batch": 4,
+    "fingerprint": {
+      "device": "AMD Radeon 890M",
+      "gpu_arch": "gfx1150",
+      "migraphx": "2.15.0.dev+20250912-17-195-g1afd1b89c",
+      "model_revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+      "precision": "fast",
+      "recipe_revision": 2,
+      "rocm": "7.2.53211",
+      "torch": "2.14.1+rocm7.2"
+    },
+    "image_tokens": 66,
+    "modality": "image",
+    "requested_batch": 4,
+    "sequence": 70,
+    "vision_batch": 4,
+    "vision_kind": "compiled"
+  },
+  "reference": {
+    "text_to_image": 86.25,
+    "image_to_text": 94.140625
+  },
+  "candidate": {
+    "text_to_image": 86.09375,
+    "image_to_text": 93.75
+  },
+  "loss_percentage_points": {
+    "text_to_image": 0.15625,
+    "image_to_text": 0.390625
+  },
+  "min_cosine_to_fp32": {
+    "images": 0.9863858222961426,
+    "texts": 0.4475463032722473
+  },
+  "criterion": "Both retrieval R@1 losses are at most 1.0 percentage point",
+  "passed": true
+}

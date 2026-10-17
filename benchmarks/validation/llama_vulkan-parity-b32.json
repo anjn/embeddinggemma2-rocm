@@ -1,0 +1,25 @@
+{
+  "batch": 32,
+  "budget": 70,
+  "min_cosine_to_single": 0.9999969005584717,
+  "reversal_min_cosine": 0.9999945163726807,
+  "reversal_max_abs": 0.0004142317920923233,
+  "metadata": {
+    "system": "CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX_VNNI = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | AVX512_BF16 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | ",
+    "flash_attention": true,
+    "vision_batch_limit": 16,
+    "source_revision": "f12aaa344c971556ec35be054d7aac1d901fd510",
+    "precision": "BF16 GGUF weights; default FP16 K/V cache",
+    "resize_min_tokens": 57,
+    "resize_max_tokens": 70,
+    "gpu_backend": "Vulkan0",
+    "actual_image_tokens": 66,
+    "actual_sequence_length": 70,
+    "vision_calls": 2,
+    "backbone_batch": 32
+  },
+  "cosine_threshold": 0.999,
+  "absolute_threshold": 0.005,
+  "passed": true,
+  "min_cosine_to_original_fp32": 0.945828378200531
+}

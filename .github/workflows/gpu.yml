@@ -1,0 +1,40 @@
+name: GPU validation
+on:
+  workflow_dispatch:
+    inputs:
+      bundle:
+        description: Absolute prepared bundle path on a trusted self-hosted runner (including preparation references)
+        required: true
+      architecture:
+        description: HIP architecture of the runner GPU
+        default: gfx1150
+        required: true
+jobs:
+  parity:
+    runs-on: [self-hosted, linux, rocm]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --build-arg "GPU_ARCH=$GPU_ARCH" -t eg2-ci .
+        env:
+          GPU_ARCH: ${{ inputs.architecture }}
+      - name: Native and HTTP verification
+        env:
+          BUNDLE: ${{ inputs.bundle }}
+        run: |
+          mkdir -p artifacts/ci
+          docker run --rm --device=/dev/kfd --device=/dev/dri \
+            --group-add "$(stat -c %g /dev/kfd)" \
+            -v "$BUNDLE:/data/bundle:ro" -v "$PWD:/src:ro" \
+            -v "$PWD/artifacts/ci:/results" --entrypoint bash eg2-ci -e -c '
+              /opt/eg2/bin/eg2-example /data/bundle 1
+              /opt/eg2/bin/eg2-example-c /data/bundle
+              /opt/eg2/bin/eg2-text-example /data/bundle
+              python /src/tests/text_parity.py --bundle /data/bundle --output /results/text-parity.json
+              python /src/tests/tokenizer_parity.py --bundle /data/bundle --tokenizer /data/bundle/tokenizer.json
+              python /src/tests/native_lifecycle.py --bundle /data/bundle
+              python /src/tests/gpu_server.py --bundle /data/bundle
+            '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gpu-validation
+          path: artifacts/ci

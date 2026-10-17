@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.17.0-1032-oem-x86_64-with-glibc2.39",
+    "numpy": "2.5.4",
+    "pillow": "13.0.0"
+  },
+  "backend": "llama",
+  "budget": 70,
+  "batch": 32,
+  "input_size": [
+    512,
+    288
+  ],
+  "input_sha256": "2204ad48eb120087f146d7cf9c963e592f2e3d7378799dfb56992bb7f3f9723b",
+  "scope": "Direct in-process CPU uint8 RGB to CPU normalized float32 embeddings; includes preprocessing and transfers; excludes fixture generation/prescale, file IO, load, compile and warmup",
+  "warmup": 3,
+  "repeat": 5,
+  "status": "ok",
+  "seconds": [
+    3.3508898110012524,
+    3.343653649033513,
+    3.346049176005181,
+    3.3448700120206922,
+    3.346459947002586
+  ],
+  "median_ms_per_image": 104.5640367501619,
+  "images_per_second": 9.563517544653818,
+  "metadata": {
+    "system": "ROCm : NO_VMM = 1 | FA_QUANTS = q4_0-q4_0,q8_0-q8_0,f16-f16,bf16-bf16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX_VNNI = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | AVX512_BF16 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | ",
+    "flash_attention": true,
+    "vision_batch_limit": 16,
+    "source_revision": "f12aaa344c971556ec35be054d7aac1d901fd510",
+    "precision": "BF16 GGUF weights; default FP16 K/V cache",
+    "resize_min_tokens": 57,
+    "resize_max_tokens": 70,
+    "gpu_backend": "ROCm0",
+    "actual_image_tokens": 66,
+    "actual_sequence_length": 70,
+    "vision_calls": 2,
+    "backbone_batch": 32
+  },
+  "runner_id": "llama_hip",
+  "round": 1,
+  "wall_seconds": 28.976417064666748
+}

@@ -1,0 +1,353 @@
+{
+  "schema": 1,
+  "budget": 70,
+  "batch": 4,
+  "selected": {
+    "vision_batch": 4,
+    "bundle": "/workspace/artifacts/portable/tuning/1792213692775089458/vision4",
+    "ms_per_image": 50.694018755166326,
+    "min_cosine_to_standard": 0.9999560117721558
+  },
+  "candidates": [
+    {
+      "vision_batch": 1,
+      "bundle": "/workspace/artifacts/portable/tuning/1792213692775089458/vision1",
+      "ms_per_image": 52.91622050572187,
+      "min_cosine_to_standard": 0.9999572038650513
+    },
+    {
+      "vision_batch": 4,
+      "bundle": "/workspace/artifacts/portable/tuning/1792213692775089458/vision4",
+      "ms_per_image": 50.694018755166326,
+      "min_cosine_to_standard": 0.9999560117721558
+    }
+  ],
+  "activated": false,
+  "quality_status": "numeric calibration only; retrieval validation required before activation",
+  "measurements": [
+    {
+      "schema": 1,
+      "environment": {
+        "python": "3.12.3",
+        "platform": "Linux-6.17.0-1032-oem-x86_64-with-glibc2.39",
+        "numpy": "2.5.4",
+        "pillow": "13.0.0"
+      },
+      "backend": "native",
+      "budget": 70,
+      "batch": 4,
+      "input_size": [
+        512,
+        288
+      ],
+      "input_sha256": "f51693138bed6628b6e20732e2bb14c455bf96960d168dc6a6d1c7abc4873448",
+      "scope": "Direct in-process CPU uint8 RGB to CPU normalized float32 embeddings; includes preprocessing and transfers; excludes fixture generation/prescale, file IO, load, compile and warmup",
+      "warmup": 3,
+      "repeat": 5,
+      "status": "ok",
+      "seconds": [
+        0.2114737220108509,
+        0.21185604203492403,
+        0.2183856680057943,
+        0.21415931498631835,
+        0.21422119199996814
+      ],
+      "median_ms_per_image": 53.53982874657959,
+      "images_per_second": 18.677683948772163,
+      "metadata": {
+        "capabilities": {
+          "gpu": {
+            "arch": "gfx1150",
+            "name": "AMD Radeon 890M"
+          },
+          "hip_runtime_version": 70253211,
+          "last_execution": {
+            "budget": 70,
+            "chunks": 1,
+            "execution_batch": 4,
+            "fingerprint": {
+              "device": "AMD Radeon 890M",
+              "gpu_arch": "gfx1150",
+              "migraphx": "2.15.0.dev+20250912-17-195-g1afd1b89c",
+              "model_revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+              "precision": "fast",
+              "recipe_revision": 2,
+              "rocm": "7.2.53211",
+              "torch": "2.14.1+rocm7.2"
+            },
+            "image_tokens": 66,
+            "modality": "image",
+            "requested_batch": 4,
+            "sequence": 70,
+            "vision_batch": 1,
+            "vision_kind": "compiled"
+          },
+          "model": "google/embeddinggemma-2",
+          "profiles": [
+            {
+              "aspect": [
+                16,
+                9
+              ],
+              "batch": 4,
+              "budget": 70,
+              "path": "gfx1150-budget70-b4-aspect16x9-fast-v1-r2",
+              "precision": "fast"
+            }
+          ],
+          "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+          "schema": 1,
+          "text_profiles": [],
+          "tokenizer": "tokenizer.json"
+        }
+      },
+      "vision_batch": 1,
+      "round": 0,
+      "min_cosine_to_standard": 0.9999572038650513,
+      "numeric_pass": true
+    },
+    {
+      "schema": 1,
+      "environment": {
+        "python": "3.12.3",
+        "platform": "Linux-6.17.0-1032-oem-x86_64-with-glibc2.39",
+        "numpy": "2.5.4",
+        "pillow": "13.0.0"
+      },
+      "backend": "native",
+      "budget": 70,
+      "batch": 4,
+      "input_size": [
+        512,
+        288
+      ],
+      "input_sha256": "f51693138bed6628b6e20732e2bb14c455bf96960d168dc6a6d1c7abc4873448",
+      "scope": "Direct in-process CPU uint8 RGB to CPU normalized float32 embeddings; includes preprocessing and transfers; excludes fixture generation/prescale, file IO, load, compile and warmup",
+      "warmup": 3,
+      "repeat": 5,
+      "status": "ok",
+      "seconds": [
+        0.2035778490244411,
+        0.2055858090170659,
+        0.20457514497684315,
+        0.2026748220087029,
+        0.203480091993697
+      ],
+      "median_ms_per_image": 50.89446225611027,
+      "images_per_second": 19.648503111553012,
+      "metadata": {
+        "capabilities": {
+          "gpu": {
+            "arch": "gfx1150",
+            "name": "AMD Radeon 890M"
+          },
+          "hip_runtime_version": 70253211,
+          "last_execution": {
+            "budget": 70,
+            "chunks": 1,
+            "execution_batch": 4,
+            "fingerprint": {
+              "device": "AMD Radeon 890M",
+              "gpu_arch": "gfx1150",
+              "migraphx": "2.15.0.dev+20250912-17-195-g1afd1b89c",
+              "model_revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+              "precision": "fast",
+              "recipe_revision": 2,
+              "rocm": "7.2.53211",
+              "torch": "2.14.1+rocm7.2"
+            },
+            "image_tokens": 66,
+            "modality": "image",
+            "requested_batch": 4,
+            "sequence": 70,
+            "vision_batch": 4,
+            "vision_kind": "compiled"
+          },
+          "model": "google/embeddinggemma-2",
+          "profiles": [
+            {
+              "aspect": [
+                16,
+                9
+              ],
+              "batch": 4,
+              "budget": 70,
+              "path": "gfx1150-budget70-b4-aspect16x9-fast-v4-r2",
+              "precision": "fast"
+            }
+          ],
+          "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+          "schema": 1,
+          "text_profiles": [],
+          "tokenizer": "tokenizer.json"
+        }
+      },
+      "vision_batch": 4,
+      "round": 0,
+      "min_cosine_to_standard": 0.9999560117721558,
+      "numeric_pass": true
+    },
+    {
+      "schema": 1,
+      "environment": {
+        "python": "3.12.3",
+        "platform": "Linux-6.17.0-1032-oem-x86_64-with-glibc2.39",
+        "numpy": "2.5.4",
+        "pillow": "13.0.0"
+      },
+      "backend": "native",
+      "budget": 70,
+      "batch": 4,
+      "input_size": [
+        512,
+        288
+      ],
+      "input_sha256": "f51693138bed6628b6e20732e2bb14c455bf96960d168dc6a6d1c7abc4873448",
+      "scope": "Direct in-process CPU uint8 RGB to CPU normalized float32 embeddings; includes preprocessing and transfers; excludes fixture generation/prescale, file IO, load, compile and warmup",
+      "warmup": 3,
+      "repeat": 5,
+      "status": "ok",
+      "seconds": [
+        0.20187193300807849,
+        0.2028773280326277,
+        0.20260227395920083,
+        0.201053683005739,
+        0.201063071959652
+      ],
+      "median_ms_per_image": 50.46798325201962,
+      "images_per_second": 19.81454251909268,
+      "metadata": {
+        "capabilities": {
+          "gpu": {
+            "arch": "gfx1150",
+            "name": "AMD Radeon 890M"
+          },
+          "hip_runtime_version": 70253211,
+          "last_execution": {
+            "budget": 70,
+            "chunks": 1,
+            "execution_batch": 4,
+            "fingerprint": {
+              "device": "AMD Radeon 890M",
+              "gpu_arch": "gfx1150",
+              "migraphx": "2.15.0.dev+20250912-17-195-g1afd1b89c",
+              "model_revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+              "precision": "fast",
+              "recipe_revision": 2,
+              "rocm": "7.2.53211",
+              "torch": "2.14.1+rocm7.2"
+            },
+            "image_tokens": 66,
+            "modality": "image",
+            "requested_batch": 4,
+            "sequence": 70,
+            "vision_batch": 4,
+            "vision_kind": "compiled"
+          },
+          "model": "google/embeddinggemma-2",
+          "profiles": [
+            {
+              "aspect": [
+                16,
+                9
+              ],
+              "batch": 4,
+              "budget": 70,
+              "path": "gfx1150-budget70-b4-aspect16x9-fast-v4-r2",
+              "precision": "fast"
+            }
+          ],
+          "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+          "schema": 1,
+          "text_profiles": [],
+          "tokenizer": "tokenizer.json"
+        }
+      },
+      "vision_batch": 4,
+      "round": 1,
+      "min_cosine_to_standard": 0.9999560117721558,
+      "numeric_pass": true
+    },
+    {
+      "schema": 1,
+      "environment": {
+        "python": "3.12.3",
+        "platform": "Linux-6.17.0-1032-oem-x86_64-with-glibc2.39",
+        "numpy": "2.5.4",
+        "pillow": "13.0.0"
+      },
+      "backend": "native",
+      "budget": 70,
+      "batch": 4,
+      "input_size": [
+        512,
+        288
+      ],
+      "input_sha256": "f51693138bed6628b6e20732e2bb14c455bf96960d168dc6a6d1c7abc4873448",
+      "scope": "Direct in-process CPU uint8 RGB to CPU normalized float32 embeddings; includes preprocessing and transfers; excludes fixture generation/prescale, file IO, load, compile and warmup",
+      "warmup": 3,
+      "repeat": 5,
+      "status": "ok",
+      "seconds": [
+        0.2135290700243786,
+        0.21004107798216864,
+        0.20946673199068755,
+        0.21077700902242213,
+        0.2109146260190755
+      ],
+      "median_ms_per_image": 52.694252255605534,
+      "images_per_second": 18.977401845447414,
+      "metadata": {
+        "capabilities": {
+          "gpu": {
+            "arch": "gfx1150",
+            "name": "AMD Radeon 890M"
+          },
+          "hip_runtime_version": 70253211,
+          "last_execution": {
+            "budget": 70,
+            "chunks": 1,
+            "execution_batch": 4,
+            "fingerprint": {
+              "device": "AMD Radeon 890M",
+              "gpu_arch": "gfx1150",
+              "migraphx": "2.15.0.dev+20250912-17-195-g1afd1b89c",
+              "model_revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+              "precision": "fast",
+              "recipe_revision": 2,
+              "rocm": "7.2.53211",
+              "torch": "2.14.1+rocm7.2"
+            },
+            "image_tokens": 66,
+            "modality": "image",
+            "requested_batch": 4,
+            "sequence": 70,
+            "vision_batch": 1,
+            "vision_kind": "compiled"
+          },
+          "model": "google/embeddinggemma-2",
+          "profiles": [
+            {
+              "aspect": [
+                16,
+                9
+              ],
+              "batch": 4,
+              "budget": 70,
+              "path": "gfx1150-budget70-b4-aspect16x9-fast-v1-r2",
+              "precision": "fast"
+            }
+          ],
+          "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+          "schema": 1,
+          "text_profiles": [],
+          "tokenizer": "tokenizer.json"
+        }
+      },
+      "vision_batch": 1,
+      "round": 1,
+      "min_cosine_to_standard": 0.9999572038650513,
+      "numeric_pass": true
+    }
+  ]
+}

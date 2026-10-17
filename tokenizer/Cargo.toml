@@ -1,0 +1,9 @@
+[package]
+name = "eg2-tokenizer"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+[lib]
+crate-type = ["staticlib"]
+[dependencies]
+tokenizers = { version = "=0.22.1", default-features = false, features = ["onig"] }

@@ -1,0 +1,36 @@
+{
+  "mode": "Image embeddings with fixed original FP32 text queries",
+  "backend": "torch",
+  "budget": 70,
+  "batch": 4,
+  "images": 256,
+  "captions": 1280,
+  "input_sha256": "62f0a0c9c7ef269a52ee440c48ee2a0d3f37facbd01761bf08d6874ff4ea5d02",
+  "reference": {
+    "text_to_image": 86.25,
+    "image_to_text": 94.140625
+  },
+  "candidate": {
+    "text_to_image": 86.015625,
+    "image_to_text": 93.75
+  },
+  "loss_percentage_points": {
+    "text_to_image": 0.234375,
+    "image_to_text": 0.390625
+  },
+  "min_cosine_to_fp32": 0.9985287189483643,
+  "passed": true,
+  "metadata": {
+    "torch": "2.14.1+rocm7.2",
+    "rocm": "7.2.53211",
+    "gpu": "AMD Radeon 890M",
+    "dtype": "bf16",
+    "parameter_dtype": "bf16",
+    "autocast_dtype": null,
+    "attention": "sdpa",
+    "text_attention": "eager",
+    "model_revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+    "actual_sequence_length": 70,
+    "actual_image_tokens": 66
+  }
+}

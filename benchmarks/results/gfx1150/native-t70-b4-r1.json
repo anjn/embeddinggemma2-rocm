@@ -1,0 +1,233 @@
+{
+  "schema": 1,
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.17.0-1032-oem-x86_64-with-glibc2.39",
+    "numpy": "2.5.4",
+    "pillow": "13.0.0"
+  },
+  "backend": "native",
+  "budget": 70,
+  "batch": 4,
+  "input_size": [
+    512,
+    288
+  ],
+  "input_sha256": "f51693138bed6628b6e20732e2bb14c455bf96960d168dc6a6d1c7abc4873448",
+  "scope": "Direct in-process CPU uint8 RGB to CPU normalized float32 embeddings; includes preprocessing and transfers; excludes fixture generation/prescale, file IO, load, compile and warmup",
+  "warmup": 3,
+  "repeat": 5,
+  "status": "ok",
+  "seconds": [
+    0.20295688998885453,
+    0.20450530701782554,
+    0.20134909404441714,
+    0.2022885840269737,
+    0.20216328697279096
+  ],
+  "median_ms_per_image": 50.572146006743424,
+  "images_per_second": 19.773730777939647,
+  "metadata": {
+    "capabilities": {
+      "gpu": {
+        "arch": "gfx1150",
+        "name": "AMD Radeon 890M"
+      },
+      "hip_runtime_version": 70253211,
+      "last_execution": {
+        "budget": 70,
+        "chunks": 1,
+        "execution_batch": 4,
+        "fingerprint": {
+          "device": "AMD Radeon 890M",
+          "gpu_arch": "gfx1150",
+          "migraphx": "2.15.0.dev+20250912-17-195-g1afd1b89c",
+          "model_revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+          "precision": "fast",
+          "recipe_revision": 2,
+          "rocm": "7.2.53211",
+          "torch": "2.14.1+rocm7.2"
+        },
+        "image_tokens": 66,
+        "modality": "image",
+        "requested_batch": 4,
+        "sequence": 70,
+        "vision_batch": 4,
+        "vision_kind": "compiled"
+      },
+      "model": "google/embeddinggemma-2",
+      "profiles": [
+        {
+          "aspect": [
+            16,
+            9
+          ],
+          "batch": 1,
+          "budget": 70,
+          "path": "gfx1150-budget70-b1-aspect16x9-fast-v1-r2",
+          "precision": "fast"
+        },
+        {
+          "aspect": [
+            16,
+            9
+          ],
+          "batch": 4,
+          "budget": 70,
+          "path": "gfx1150-budget70-b4-aspect16x9-fast-v4-r2",
+          "precision": "fast"
+        },
+        {
+          "aspect": [
+            16,
+            9
+          ],
+          "batch": 32,
+          "budget": 140,
+          "path": "gfx1150-budget140-b32-aspect16x9-fast-v16-r2",
+          "precision": "fast"
+        },
+        {
+          "aspect": [
+            16,
+            9
+          ],
+          "batch": 128,
+          "budget": 140,
+          "path": "gfx1150-budget140-b128-aspect16x9-fast-v16-r2",
+          "precision": "fast"
+        },
+        {
+          "aspect": [
+            16,
+            9
+          ],
+          "batch": 1,
+          "budget": 140,
+          "path": "gfx1150-budget140-b1-aspect16x9-fast-v1-r2",
+          "precision": "fast"
+        },
+        {
+          "aspect": [
+            16,
+            9
+          ],
+          "batch": 4,
+          "budget": 140,
+          "path": "gfx1150-budget140-b4-aspect16x9-fast-v4-r2",
+          "precision": "fast"
+        },
+        {
+          "aspect": [
+            16,
+            9
+          ],
+          "batch": 32,
+          "budget": 280,
+          "path": "gfx1150-budget280-b32-aspect16x9-fast-v4-r2",
+          "precision": "fast"
+        },
+        {
+          "aspect": [
+            16,
+            9
+          ],
+          "batch": 128,
+          "budget": 280,
+          "path": "gfx1150-budget280-b128-aspect16x9-fast-v4-r2",
+          "precision": "fast"
+        },
+        {
+          "aspect": [
+            16,
+            9
+          ],
+          "batch": 1,
+          "budget": 280,
+          "path": "gfx1150-budget280-b1-aspect16x9-fast-v1-r2",
+          "precision": "fast"
+        },
+        {
+          "aspect": [
+            16,
+            9
+          ],
+          "batch": 4,
+          "budget": 280,
+          "path": "gfx1150-budget280-b4-aspect16x9-fast-v4-r2",
+          "precision": "fast"
+        },
+        {
+          "aspect": [
+            16,
+            9
+          ],
+          "batch": 128,
+          "budget": 70,
+          "path": "gfx1150-budget70-b128-aspect16x9-fast-v16-r3",
+          "precision": "fast"
+        },
+        {
+          "aspect": [
+            16,
+            9
+          ],
+          "batch": 32,
+          "budget": 70,
+          "path": "gfx1150-budget70-b32-aspect16x9-fast-v16-r3",
+          "precision": "fast"
+        }
+      ],
+      "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+      "schema": 1,
+      "text_profiles": [
+        {
+          "batch": 1,
+          "kind": "torchscript",
+          "path": "text-standard-v5.pt",
+          "precision": "standard",
+          "sequence": 32
+        },
+        {
+          "batch": 1,
+          "kind": "torchscript",
+          "path": "text-standard-v5.pt",
+          "precision": "standard",
+          "sequence": 128
+        },
+        {
+          "batch": 1,
+          "kind": "torchscript",
+          "path": "text-standard-v5.pt",
+          "precision": "standard",
+          "sequence": 1024
+        },
+        {
+          "batch": 4,
+          "kind": "torchscript",
+          "path": "text-standard-v5.pt",
+          "precision": "standard",
+          "sequence": 32
+        },
+        {
+          "batch": 4,
+          "kind": "torchscript",
+          "path": "text-standard-v5.pt",
+          "precision": "standard",
+          "sequence": 128
+        },
+        {
+          "batch": 4,
+          "kind": "torchscript",
+          "path": "text-standard-v5.pt",
+          "precision": "standard",
+          "sequence": 1024
+        }
+      ],
+      "tokenizer": "tokenizer.json"
+    }
+  },
+  "runner_id": "native",
+  "round": 1,
+  "wall_seconds": 8.442541599273682
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.17.0-1032-oem-x86_64-with-glibc2.39",
+    "numpy": "2.5.4",
+    "pillow": "13.0.0"
+  },
+  "backend": "llama",
+  "budget": 70,
+  "batch": 4,
+  "input_size": [
+    512,
+    288
+  ],
+  "input_sha256": "f51693138bed6628b6e20732e2bb14c455bf96960d168dc6a6d1c7abc4873448",
+  "scope": "Direct in-process CPU uint8 RGB to CPU normalized float32 embeddings; includes preprocessing and transfers; excludes fixture generation/prescale, file IO, load, compile and warmup",
+  "warmup": 3,
+  "repeat": 5,
+  "status": "ok",
+  "seconds": [
+    0.6049849420087412,
+    0.6011857850244269,
+    0.5978700449923053,
+    0.5956530640251003,
+    0.5949086250038818
+  ],
+  "median_ms_per_image": 149.46751124807633,
+  "images_per_second": 6.69041714583891,
+  "metadata": {
+    "system": "CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX_VNNI = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | AVX512_BF16 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | ",
+    "flash_attention": false,
+    "vision_batch_limit": 16,
+    "source_revision": "f12aaa344c971556ec35be054d7aac1d901fd510",
+    "precision": "BF16 GGUF weights; default FP16 K/V cache",
+    "gpu_backend": "Vulkan0",
+    "actual_image_tokens": 66,
+    "actual_sequence_length": 70,
+    "vision_calls": 1,
+    "backbone_batch": 4
+  },
+  "runner_id": "llama_vulkan_off",
+  "round": 0,
+  "wall_seconds": 5.821126461029053
+}

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "embeddinggemma2-rocm"
+version = "0.1.0"
+description = "Native AMD GPU image and text embeddings with per-GPU tuning"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = ["numpy>=2.0", "pillow>=11"]
+[project.optional-dependencies]
+prepare = ["torch>=2.14.1", "torchvision>=0.29.1", "transformers==5.20.0", "sentence-transformers==6.1.0", "onnx>=1.18", "huggingface-hub", "msgpack", "safetensors"]
+server = ["fastapi>=0.115", "uvicorn>=0.34"]
+bench = ["httpx>=0.28"]
+test = ["pytest>=8", "httpx>=0.28"]
+[project.scripts]
+eg2 = "embeddinggemma2_rocm.cli:main"
+[tool.setuptools.packages.find]
+where = ["python"]
+
+[tool.setuptools.package-data]
+embeddinggemma2_rocm = ["_compiler/kernels/*.cpp"]

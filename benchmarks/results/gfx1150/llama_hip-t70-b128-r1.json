@@ -1,0 +1,9 @@
+{
+  "status": "validation_failed",
+  "budget": 70,
+  "batch": 128,
+  "backend": "llama",
+  "runner_id": "llama_hip",
+  "round": 1,
+  "reason": "HIP mixed-batch128 failed fixed real-photo reversal tolerance (cosine>=0.999 and max_abs<=0.005), with Flash Attention both on and off; larger-budget128 configurations excluded pending validation."
+}

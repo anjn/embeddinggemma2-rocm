@@ -1,0 +1,9 @@
+{
+  "status": "omitted",
+  "runner_id": "llama_vulkan",
+  "backend": "llama",
+  "budget": 280,
+  "batch": 128,
+  "round": 0,
+  "reason": "Remaining large-batch measurements omitted at user request after interrupted/failed runs."
+}

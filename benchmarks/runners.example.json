@@ -1,0 +1,66 @@
+[
+  {
+    "id": "native",
+    "backend": "native",
+    "command": [
+      "eg2"
+    ],
+    "args": [
+      "--bundle",
+      "artifacts/my-gpu"
+    ]
+  },
+  {
+    "id": "torch",
+    "backend": "torch",
+    "command": [
+      "eg2"
+    ],
+    "args": [
+      "--model",
+      "models/google",
+      "--attention",
+      "sdpa",
+      "--torch-precision",
+      "bf16"
+    ]
+  },
+  {
+    "id": "llama_hip",
+    "backend": "llama",
+    "command": [
+      "eg2"
+    ],
+    "args": [
+      "--model",
+      "models/embeddinggemma-2-BF16.gguf",
+      "--mmproj",
+      "models/mmproj-embeddinggemma-2-BF16.gguf",
+      "--llama-library",
+      "build/llama-hip-adapter/libeg2_llama_adapter.so",
+      "--flash",
+      "on"
+    ],
+    "skip_batches": [
+      128
+    ],
+    "skip_reason": "HIP mixed-batch128 failed fixed real-photo reversal tolerance (cosine>=0.999 and max_abs<=0.005), with Flash Attention both on and off; larger-budget128 configurations excluded pending validation."
+  },
+  {
+    "id": "llama_vulkan",
+    "backend": "llama",
+    "command": [
+      "eg2"
+    ],
+    "args": [
+      "--model",
+      "models/embeddinggemma-2-BF16.gguf",
+      "--mmproj",
+      "models/mmproj-embeddinggemma-2-BF16.gguf",
+      "--llama-library",
+      "build/llama-vulkan-adapter/libeg2_llama_adapter.so",
+      "--flash",
+      "on"
+    ]
+  }
+]

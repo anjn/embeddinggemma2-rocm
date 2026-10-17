@@ -1,0 +1,16 @@
+[
+  {
+    "budget": 70,
+    "min_cosine_to_fp32": 0.9999860525131226,
+    "max_abs": 0.000631372444331646,
+    "aspect": "1x1",
+    "fixture": "constant RGB [127,95,63]"
+  },
+  {
+    "budget": 70,
+    "min_cosine_to_fp32": 0.999986469745636,
+    "max_abs": 0.0007945448160171509,
+    "aspect": "9x16",
+    "fixture": "constant RGB [127,95,63]"
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "status": "omitted",
+  "runner_id": "torch",
+  "backend": "torch",
+  "budget": 280,
+  "batch": 128,
+  "round": 1,
+  "reason": "Remaining large-batch measurements omitted at user request after interrupted/failed runs."
+}

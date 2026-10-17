@@ -1,0 +1,37 @@
+{
+  "mode": "Image embeddings with fixed original FP32 text queries",
+  "backend": "llama",
+  "budget": 70,
+  "batch": 4,
+  "images": 256,
+  "captions": 1280,
+  "input_sha256": "62f0a0c9c7ef269a52ee440c48ee2a0d3f37facbd01761bf08d6874ff4ea5d02",
+  "reference": {
+    "text_to_image": 86.25,
+    "image_to_text": 94.140625
+  },
+  "candidate": {
+    "text_to_image": 85.3125,
+    "image_to_text": 94.140625
+  },
+  "loss_percentage_points": {
+    "text_to_image": 0.9375,
+    "image_to_text": 0.0
+  },
+  "min_cosine_to_fp32": 0.935491144657135,
+  "passed": true,
+  "metadata": {
+    "system": "ROCm : NO_VMM = 1 | FA_QUANTS = q4_0-q4_0,q8_0-q8_0,f16-f16,bf16-bf16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX_VNNI = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | AVX512_BF16 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | ",
+    "flash_attention": true,
+    "vision_batch_limit": 16,
+    "source_revision": "f12aaa344c971556ec35be054d7aac1d901fd510",
+    "precision": "BF16 GGUF weights; default FP16 K/V cache",
+    "resize_min_tokens": 57,
+    "resize_max_tokens": 70,
+    "gpu_backend": "ROCm0",
+    "actual_image_tokens": 66,
+    "actual_sequence_length": 70,
+    "vision_calls": 1,
+    "backbone_batch": 4
+  }
+}

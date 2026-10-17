@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "checked_at": "2026-10-17T06:56:58.068398+00:00",
+  "container_image": "sha256:91b0f1827318151dc2d4c5b806030266aa6e9c57889d2e15ad36d8b2dfa1aedb",
+  "cpu_api_tests": {
+    "host_passed": 14,
+    "container_passed": 14
+  },
+  "gpu_http": {
+    "readiness": true,
+    "image_direct_parity": true,
+    "text_direct_parity": true,
+    "budget280_batch33_native_rejected": true,
+    "budget280_batch33_http_status": 503
+  },
+  "coprime_export": {
+    "aspect": [
+      1919,
+      1080
+    ],
+    "fixture_size": [
+      1919,
+      1080
+    ],
+    "grid": [
+      18,
+      33
+    ],
+    "image_tokens": 66,
+    "constant_color_fp32_reference_matches_default_aspect": true
+  },
+  "main_matrix": {
+    "successful_rounds": 85,
+    "complete_numeric_cells": 42,
+    "note": "One successful PyTorch budget280/batch128 round is intentionally not aggregated. Remaining large-batch runs were omitted at user request."
+  },
+  "known_limit": "Native budget280 accepts at most 32 images per request; original direct and chunked batch128 tests terminated with code139, cause unknown.",
+  "passed": true
+}
