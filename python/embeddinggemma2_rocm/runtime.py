@@ -134,6 +134,16 @@ class Embedder:
         if getattr(self, "_ctx", None):
             self.close()
 
+    def prepare(self):
+        """Warm all registered profiles; schema-2 profiles remain resident."""
+        with self._lock:
+            self._open()
+            function = self._lib.eg2_prepare
+            function.argtypes = [C.c_void_p, C.c_char_p, C.c_size_t]
+            function.restype = C.c_int
+            error = C.create_string_buffer(4096)
+            self._check(function(self._ctx, error, len(error)), error)
+
     @property
     def capabilities(self):
         with self._lock:
@@ -248,3 +258,12 @@ class Embedder:
     def encode_texts(self, texts, *, prompt="query", max_length=8192):
         ids, mask = self.tokenize(texts, prompt=prompt, max_length=max_length)
         return self.encode_tokens(ids, mask)
+
+
+def device_info(device=0, library=None):
+    lib = _library(library)
+    lib.eg2_device_info.argtypes = [C.c_int, C.c_char_p, C.c_size_t]
+    lib.eg2_device_info.restype = C.c_int
+    buf = C.create_string_buffer(4096)
+    Embedder._check(lib.eg2_device_info(device, buf, len(buf)), buf)
+    return json.loads(buf.value)

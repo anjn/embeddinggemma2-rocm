@@ -52,6 +52,10 @@ public:
           error);
     return out;
   }
+  void prepare() {
+    char error[4096];
+    check(eg2_prepare(handle_, error, sizeof(error)), error);
+  }
   eg2_context *get() const noexcept { return handle_; }
 };
 } // namespace eg2

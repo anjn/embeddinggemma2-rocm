@@ -11,6 +11,7 @@ p.add_argument("--source", required=True)
 p.add_argument("--binary", required=True)
 p.add_argument("--output", required=True)
 p.add_argument("--proof")
+p.add_argument("--patches", type=int, default=594)
 a = p.parse_args()
 source = Path(a.source)
 binary = Path(a.binary)
@@ -27,23 +28,23 @@ for node in v["modules"]["main"]["nodes"]:
     if op["symbol_name"] != "mul_mul_mul_add_mul_tanh_add_mul_mul_mul_kernel":
         continue
     assert (
-        op["output"]["lens"] == [a.batch, 594, 3072]
+        op["output"]["lens"] == [a.batch, a.patches, 3072]
         and op["output"]["type"] == "bf16_type"
     )
     assert len(op["expected_inputs"]) == 3 and op["output_arg"] == -1
     assert [s["strides"] for s in op["expected_inputs"]] == [
-        [594 * 6144, 6144, 1],
-        [594 * 6144, 6144, 1],
-        [594 * 3072, 3072, 1],
+        [a.patches * 6144, 6144, 1],
+        [a.patches * 6144, 6144, 1],
+        [a.patches * 3072, 3072, 1],
     ]
     assert all(
-        s["lens"] == [a.batch, 594, 3072] and s["type"] == "bf16_type"
+        s["lens"] == [a.batch, a.patches, 3072] and s["type"] == "bf16_type"
         for s in op["expected_inputs"]
     )
     op["code_object"] = code
     op["symbol_name"] = "hip_gelu_vec8_round" if a.round else "hip_gelu_vec8"
     op["local"] = 256
-    op["global"] = ((a.batch * 594 * 3072 // 8 + 255) // 256) * 256
+    op["global"] = ((a.batch * a.patches * 3072 // 8 + 255) // 256) * 256
     count += 1
 assert count == 16, count
 suffix = "gelu-round" if a.round else "gelu"

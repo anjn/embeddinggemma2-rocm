@@ -1,0 +1,31 @@
+{
+  "passed": true,
+  "cold_shared_start": true,
+  "iterations": 100,
+  "initial": {
+    "mode": "shared",
+    "profile_switches": 14,
+    "resident_image_profiles": 2,
+    "resident_text_modules": 1,
+    "resident_text_profiles": 4,
+    "rgb_capacity_bytes": 1769472,
+    "transient_allocated_bytes": 33554432,
+    "transient_reserved_bytes": 138412032,
+    "weight_allocations": 696,
+    "weight_bytes": 1672550956,
+    "workspace_bytes": 120585472
+  },
+  "final": {
+    "mode": "shared",
+    "profile_switches": 114,
+    "resident_image_profiles": 2,
+    "resident_text_modules": 1,
+    "resident_text_profiles": 4,
+    "rgb_capacity_bytes": 1769472,
+    "transient_allocated_bytes": 33554432,
+    "transient_reserved_bytes": 138412032,
+    "weight_allocations": 696,
+    "weight_bytes": 1672550956,
+    "workspace_bytes": 120585472
+  }
+}

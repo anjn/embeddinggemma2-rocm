@@ -83,118 +83,62 @@ def mixed_vision(model):
     model.embed_vision.embedding_projection.to(torch.bfloat16)
 
 
-def optimize(source, dest, arch="gfx1150"):
-    if arch != "gfx1150":
-        raise ValueError("This guarded recipe is validated for gfx1150 only")
-    source = Path(source).resolve()
-    dest = Path(dest).resolve()
+def optimize(source, dest, arch="gfx1150", *, batch=16, patches=594, config=None):
+    """Compile and install a checked, shape-specific HIP recipe on the local GPU."""
+    config = config or dict(gelu=dict(block=256,vector=4),
+                            qk=dict(block=256,lanes=16,packed=True),
+                            norm=dict(block=256,lanes=32), segmented=True)
+    source, dest = Path(source).resolve(), Path(dest).resolve()
     dest.mkdir(parents=True, exist_ok=True)
     kernels = Path(__file__).parent / "kernels"
     hipcc = shutil.which("hipcc") or "/opt/rocm/bin/hipcc"
     binaries = {}
-    for name, cpp in [
-        ("gelu", "gelu_layout.cpp"),
-        ("qk", "qk_rope_packed.cpp"),
-        ("norm", "norm_patch.cpp"),
-    ]:
-        target = dest / (name + ".hsaco")
-        subprocess.run(
-            [
-                hipcc,
-                "-O3",
-                "--genco",
-                "--offload-arch=" + arch,
-                "-DROWS=9504",
-                str(kernels / cpp),
-                "-o",
-                str(target),
-            ],
-            check=True,
-        )
+    for name, cpp in [("gelu","gelu_layout.cpp"),("qk","qk_rope_packed.cpp"),("norm","norm_patch.cpp")]:
+        if not config.get(name): continue
+        target = dest / (name+".hsaco")
+        subprocess.run([hipcc,"-O3","--genco","--offload-arch="+arch,
+                        "-DROWS="+str(batch*patches),str(kernels/cpp),"-o",str(target)],check=True,timeout=300)
         binaries[name] = target
     proof = dest / "tuple-proof.json"
-    subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "embeddinggemma2_rocm._compiler.prove_tuple",
-            "--source",
-            str(source),
-            "--batch",
-            "16",
-            "--output",
-            str(proof),
-        ],
-        check=True,
-    )
+    if config.get("qk"):
+        subprocess.run([sys.executable,"-m","embeddinggemma2_rocm._compiler.prove_tuple",
+                        "--source",str(source),"--batch",str(batch),"--patches",str(patches),
+                        "--output",str(proof)],check=True,timeout=300)
+    steps = []
+    if config.get("gelu"):
+        g=config["gelu"]
+        steps.extend([("patch_gelu","gelu",[]),
+                      ("patch_gelu_layout","gelu",["--vector",str(g["vector"]),"--block",str(g["block"])])])
+    if config.get("qk"):
+        q=config["qk"]
+        steps.append(("patch_qk_rope","qk",["--round","--all-layers","--lanes",str(q["lanes"]),
+                                             "--block",str(q["block"]),"--proof",str(proof)]))
+        if q.get("packed"):
+            if q["lanes"]!=16: raise ValueError("Packed QK requires 16 lanes")
+            steps.append(("patch_qk_packed","qk",["--block",str(q["block"])]))
+    if config.get("norm"):
+        n=config["norm"]
+        steps.append(("patch_norm_pair","norm",["--lanes",str(n["lanes"]),"--block",str(n["block"])]))
     current = source
-    steps = [
-        ("patch_gelu", "gelu", ["--batch", "16"]),
-        (
-            "patch_qk_rope",
-            "qk",
-            [
-                "--batch",
-                "16",
-                "--round",
-                "--all-layers",
-                "--lanes",
-                "16",
-                "--proof",
-                str(proof),
-            ],
-        ),
-        (
-            "patch_gelu_layout",
-            "gelu",
-            ["--batch", "16", "--vector", "4", "--block", "256"],
-        ),
-        ("patch_qk_packed", "qk", ["--batch", "16", "--block", "256"]),
-        ("patch_norm_pair", "norm", []),
-    ]
-    for i, (module, binary, args) in enumerate(steps):
-        target = dest / f"pass-{i}.mxr"
-        subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "embeddinggemma2_rocm._compiler." + module,
-                "--source",
-                str(current),
-                "--binary",
-                str(binaries[binary]),
-                "--output",
-                str(target),
-                *args,
-            ],
-            check=True,
-        )
-        current = target
-    segments = dest / "segments"
-    subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "embeddinggemma2_rocm._compiler.split_attention",
-            "--source",
-            str(current),
-            "--output-dir",
-            str(segments),
-            "--batch",
-            "16",
-            "--ffn-up",
-        ],
-        check=True,
-    )
+    for i,(module,binary,args) in enumerate(steps):
+        target=dest/f"pass-{i}.mxr"
+        subprocess.run([sys.executable,"-m","embeddinggemma2_rocm._compiler."+module,
+                        "--source",str(current),"--binary",str(binaries[binary]),
+                        "--output",str(target),"--batch",str(batch),"--patches",str(patches),*args],check=True,timeout=300)
+        current=target
+    if not config.get("segmented",True): return current
+    segments = dest/"segments"
+    subprocess.run([sys.executable,"-m","embeddinggemma2_rocm._compiler.split_attention",
+                    "--source",str(current),"--output-dir",str(segments),"--batch",str(batch),
+                    "--patches",str(patches),"--ffn-up"],check=True,timeout=300)
     from ..preparation import save_tensor, write_json
-
-    manifest = json.loads((segments / "manifest.json").read_text())
-    manifest["weight_files"] = {}
-    with np.load(segments / "weights.npz") as weights:
+    manifest=json.loads((segments/"manifest.json").read_text())
+    manifest["weight_files"]={}
+    with np.load(segments/"weights.npz") as weights:
         for name in weights.files:
-            manifest["weight_files"][name] = save_tensor(segments, name, weights[name])
-    manifest["source"] = current.name
-    write_json(segments / "manifest.json", manifest)
+            manifest["weight_files"][name]=save_tensor(segments,name,weights[name])
+    manifest["source"]=current.name
+    write_json(segments/"manifest.json",manifest)
     return segments
 
 

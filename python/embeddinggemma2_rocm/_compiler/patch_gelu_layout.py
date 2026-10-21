@@ -5,12 +5,13 @@ from pathlib import Path
 
 p = argparse.ArgumentParser()
 p.add_argument("--batch", type=int, default=16)
-p.add_argument("--vector", type=int, choices=(4, 16), default=4)
-p.add_argument("--block", type=int, choices=(128, 256), default=256)
+p.add_argument("--vector", type=int, choices=(1, 2, 4, 8, 16), default=4)
+p.add_argument("--block", type=int, choices=(64,128,256,512), default=256)
 p.add_argument("--source", required=True)
 p.add_argument("--binary", required=True)
 p.add_argument("--output", required=True)
 p.add_argument("--proof")
+p.add_argument("--patches", type=int, default=594)
 a = p.parse_args()
 source = Path(a.source)
 binary = Path(a.binary)
@@ -25,11 +26,11 @@ for n in v["modules"]["main"]["nodes"]:
     ):
         continue
     op = n["operator"]
-    assert op["output_arg"] == -1 and op["output"]["lens"] == [a.batch, 594, 3072]
+    assert op["output_arg"] == -1 and op["output"]["lens"] == [a.batch, a.patches, 3072]
     assert [s["strides"] for s in op["expected_inputs"]] == [
-        [594 * 6144, 6144, 1],
-        [594 * 6144, 6144, 1],
-        [594 * 3072, 3072, 1],
+        [a.patches * 6144, 6144, 1],
+        [a.patches * 6144, 6144, 1],
+        [a.patches * 3072, 3072, 1],
     ]
     assert all(s["type"] == "bf16_type" for s in op["expected_inputs"])
     op.update(
@@ -37,7 +38,7 @@ for n in v["modules"]["main"]["nodes"]:
         symbol_name=f"hip_gelu_v{a.vector}_r0",
         local=a.block,
         **{
-            "global": (((a.batch * 594) * 3072 // a.vector + a.block - 1) // a.block)
+            "global": (((a.batch * a.patches) * 3072 // a.vector + a.block - 1) // a.block)
             * a.block
         },
     )

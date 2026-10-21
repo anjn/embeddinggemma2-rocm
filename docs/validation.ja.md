@@ -42,3 +42,15 @@ budget 70・batch 4でVision内部バッチ1・4を比較し、順序を反転�
 中断の発生後、利用者の指示に従い、PyTorch・llama.cppの大バッチの残りの測定を省略しました。2ラウンドを完了した測定値は掲載します。PyTorchのbudget 280・batch 128は1ラウンドのみ完了しており、記録は残しますが比較表の速度値には使いません。
 
 最終コンテナーでCPU APIテスト14件と、実GPUでのreadiness・画像・テキストの一致検証に合格しました。budget 280の33枚の要求にはネイティブ側で未対応エラー、HTTP側で503を返しました。また、CPU上で1919×1080の互いに素な比率をエクスポートし、テスト画像のサイズを抑えたまま、既定比率と18×33のグリッドおよび単色画像のFP32参照出力が一致することを確認しました。[最終確認の記録](../benchmarks/validation/release-checks.json)を保存しています。
+
+## 共有プロファイルとGPU設定の再利用
+
+最初の公開設定はRadeon 890M（gfx1150）、budget 70、要求バッチ1、Vision内部バッチ1、16:9を対象にしています。単体カーネル76候補と、融合・分割実行の32通りに既定実装を加えた候補を処理し、17通りがコンパイルに成功しました。選択された設定はGELUがblock 128・vector 4、packed QK/RoPEがblock 128・lanes 16です。2巡の中央値は**35.73748 ms/画像**、独立したCPU FP32参照とのコサイン類似度は**0.999925**でした。[設定](../profiles/gpus/gfx1150/budget70-b1.json)と[測定記録](../benchmarks/results/gfx1150-hip-tuned/)を保存しています。
+
+256画像・1280キャプションの全件検査で、R@1はtext→imageが**86.484375%**、image→textが**93.359375%**でした。CPU FP32参照は86.25%・94.140625%で、低下量は−0.234375・0.78125ポイントです。[検索品質の記録](../benchmarks/validation/quality-hip-gfx1150-b70-b1.json)を参照してください。新しい準備先で公開設定を自動選択し、探索なしで同じ出力を再現することも確認しました。[再利用の記録](../benchmarks/validation/preset-reuse.json)を保存しています。他のGPUは候補生成と構造検査付きコンパイルに対応しますが、実測済み設定はまだ含みません。
+
+画像とテキストのbatch 1・4を100回切り替える検査では、画像2組・テキスト4組を保持し、暖機後の重み、作業領域、RGB入力領域、LibTorch一時領域の確保量が一定でした。出力は従来形式と一致しました。この組み合わせの重みは1,672,550,956 bytes、作業領域は120,585,472 bytes、一時領域の予約量は138,412,032 bytesです。コードやグラフの管理情報、他プロセスの使用量は含みません。[メモリ検査の記録](../benchmarks/validation/shared-profile-memory.json)を参照してください。
+
+今回コンパイルした通常精度のbatch 1 GPU参照値は、CPU FP32と一致しませんでした。根本原因は未確定です。チューナーはコンパイラの出力を正解とせず、独立したCPU FP32を1画像ずつ実行して検証するよう変更しました。[診断記録](../benchmarks/validation/standard-reference-diagnostic.json)を保存しています。候補のコサイン類似度0.995以上と検索品質の基準は維持しています。
+
+budget 70・batch 128の分割実行経路でも、異なる128画像の出力が共有化前後で完全一致しました。中央値は26.52 ms/画像から26.73 ms/画像となり、増加は約0.8%で、5%の許容範囲内でした。[検査結果](../benchmarks/validation/shared-fast128-regression.json)を保存しています。対象プロファイルを含むバンドルを指定し、`python tests/shared_pipeline.py --legacy LEGACY --shared SHARED --output RESULT.json`で再検査できます。

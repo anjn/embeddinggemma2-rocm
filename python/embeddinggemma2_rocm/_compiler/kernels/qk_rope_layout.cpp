@@ -23,8 +23,16 @@ template<int LANES> __device__ void compact(const unsigned short*x,const float*w
 MAKE(4)
 MAKE(8)
 MAKE(16)
+MAKE(32)
+MAKE(64)
 extern "C" int test_layout(void*x,void*w,void*c,void*s,void*y,int lanes,void*stream){
  #define RUN(L) hipLaunchKernelGGL(hip_norm_rope_l##L,dim3(ROWS*12*L/128),dim3(128),0,(hipStream_t)stream,(unsigned short*)x,(float*)w,(unsigned short*)c,(unsigned short*)s,(unsigned short*)y)
  if(lanes==4){RUN(4);}else if(lanes==8){RUN(8);}else if(lanes==16){RUN(16);}else if(lanes==32){hipLaunchKernelGGL(hip_norm_rope_round,dim3(ROWS*12/4),dim3(128),0,(hipStream_t)stream,(unsigned short*)x,(float*)w,(unsigned short*)c,(unsigned short*)s,(unsigned short*)y);}else return 1;
+ return hipGetLastError();
+}
+
+extern "C" int test_layout_block(void*x,void*w,void*c,void*s,void*y,int lanes,int block,void*stream){
+#define LAUNCH(L) hipLaunchKernelGGL(hip_norm_rope_l##L,dim3((ROWS*12*L+block-1)/block),dim3(block),0,(hipStream_t)stream,(unsigned short*)x,(float*)w,(unsigned short*)c,(unsigned short*)s,(unsigned short*)y)
+ if(lanes==4){LAUNCH(4);}else if(lanes==8){LAUNCH(8);}else if(lanes==16){LAUNCH(16);}else if(lanes==32){LAUNCH(32);}else if(lanes==64){LAUNCH(64);}else{return 1;}
  return hipGetLastError();
 }

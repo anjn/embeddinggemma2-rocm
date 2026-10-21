@@ -12,7 +12,7 @@ dependencies = ["numpy>=2.0", "pillow>=11"]
 prepare = ["torch>=2.14.1", "torchvision>=0.29.1", "transformers==5.20.0", "sentence-transformers==6.1.0", "onnx>=1.18", "huggingface-hub", "msgpack", "safetensors"]
 server = ["fastapi>=0.115", "uvicorn>=0.34"]
 bench = ["httpx>=0.28"]
-test = ["pytest>=8", "httpx>=0.28"]
+test = ["pytest>=8", "httpx>=0.28", "msgpack"]
 [project.scripts]
 eg2 = "embeddinggemma2_rocm.cli:main"
 [tool.setuptools.packages.find]

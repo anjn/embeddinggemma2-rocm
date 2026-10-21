@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "recipe": "profiles/gpus/gfx1150/budget70-b1.json",
+  "tuning_source": "published",
+  "search_executed": false,
+  "max_absolute_error": 0.0
+}

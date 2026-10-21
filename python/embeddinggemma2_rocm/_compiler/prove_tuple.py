@@ -16,6 +16,7 @@ p = argparse.ArgumentParser()
 p.add_argument("--batch", type=int, default=32)
 p.add_argument("--source", required=True)
 p.add_argument("--output", required=True)
+p.add_argument("--patches", type=int, default=594)
 a = p.parse_args()
 torch.set_num_threads(4)
 torch.manual_seed(541)
@@ -108,7 +109,7 @@ outputs = program.run_async(
 assert len(outputs) == 2
 errors = []
 for index, base in ((0, 5), (1, 2)):
-    out = torch.empty(a.batch, 594, 12, 64, device="cuda", dtype=torch.bfloat16)
+    out = torch.empty(a.batch, a.patches, 12, 64, device="cuda", dtype=torch.bfloat16)
     assert (
         hip.hipMemcpyAsync(
             out.data_ptr(),

@@ -1,9 +1,11 @@
 #include <ATen/ATen.h>
 #include <ATen/Parallel.h>
 #include <ATen/hip/HIPGraph.h>
+#include <ATen/hip/MemPool.h>
 #include <ATen/ops/_scaled_dot_product_flash_attention.h>
 #include <algorithm>
 #include <c10/core/InferenceMode.h>
+#include <c10/hip/HIPCachingAllocator.h>
 #include <c10/hip/HIPGuard.h>
 #include <c10/hip/HIPStream.h>
 #include <cstring>
@@ -28,7 +30,8 @@ extern "C" void eg2_tokenizer_free(void *);
 extern "C" int eg2_tokenizer_encode(const void *, const char *const *, size_t,
                                     const char *, int64_t *, int64_t *, size_t,
                                     size_t *, char *, size_t);
-extern "C" int eg2_patchify(void *, void *, int, int, int, int, int, void *);
+extern "C" int eg2_patchify_config(void *, void *, int, int, int, int, int,
+                                   void *, int, int);
 namespace {
 void mg(migraphx_status s) {
   if (s != migraphx_status_success)
@@ -85,6 +88,96 @@ at::Tensor tensor_file(const fs::path &root, const json &s, int device) {
     throw std::runtime_error("Cannot read tensor");
   return t.to(at::Device(at::kCUDA, device));
 }
+// One serialized context owns stable addresses shared by every profile.
+struct SharedMemory {
+  fs::path root;
+  json config;
+  int device;
+  at::Tensor arena, rgb;
+  size_t cursor = 0, weights_bytes = 0, switches = 0;
+  std::string active;
+  std::map<std::string, at::Tensor> weights;
+  c10::cuda::CUDAStream stream;
+  at::cuda::MemPool transient;
+  SharedMemory(const fs::path &p, const json &c, int dev)
+      : root(p), config(c), device(dev),
+        stream(c10::cuda::getStreamFromPool(false, dev)) {
+    arena = at::empty({config.at("workspace_bytes").get<int64_t>()}, gpu(dev));
+  }
+  void reset() { cursor = 0; }
+  at::Tensor allocate(at::IntArrayRef sizes, at::ScalarType type) {
+    size_t count = 1;
+    for (auto n : sizes)
+      count *= n;
+    size_t bytes = count * c10::elementSize(type);
+    if (cursor + bytes > size_t(arena.numel()))
+      throw std::runtime_error("Shared workspace manifest is too small");
+    auto result = arena.narrow(0, cursor, bytes).view(type).view(sizes);
+    cursor += (bytes + 255) / 256 * 256;
+    return result;
+  }
+  at::Tensor weight(const std::string &id) {
+    auto spec = config.at("weights").at(id);
+    auto key = spec.at("sha256").get<std::string>();
+    if (weights.count(key)) {
+      if (weights.at(key).nbytes() != spec.at("bytes").get<size_t>())
+        throw std::runtime_error("Inconsistent shared weight extent");
+      return weights.at(key);
+    }
+    auto host = at::empty({spec.at("bytes").get<int64_t>()}, at::kByte);
+    std::ifstream f(root / spec.at("file").get<std::string>(),
+                    std::ios::binary | std::ios::ate);
+    if (!f || f.tellg() != static_cast<std::streamoff>(host.nbytes()))
+      throw std::runtime_error("Shared weight size mismatch");
+    f.seekg(0);
+    f.read(static_cast<char *>(host.data_ptr()), host.nbytes());
+    if (!f)
+      throw std::runtime_error("Cannot read shared weight");
+    auto value = host.to(at::Device(at::kCUDA, device));
+    weights_bytes += value.nbytes();
+    weights.emplace(key, value);
+    return value;
+  }
+  at::Tensor tensor(const fs::path &path, const json &spec) {
+    auto key = spec.at("sha256").get<std::string>();
+    if (!weights.count(key)) {
+      auto value =
+          tensor_file(path, spec, device).reshape({-1}).view(at::kByte);
+      weights_bytes += value.nbytes();
+      weights.emplace(key, value);
+    }
+    return weights.at(key)
+        .view(dtype(spec.at("dtype")))
+        .view(spec.at("lens").get<std::vector<int64_t>>());
+  }
+
+  void activate(const std::string &key) {
+    if (active != key) {
+      ++switches;
+      active = key;
+    }
+  }
+};
+struct PoolGuard {
+  SharedMemory *memory;
+  explicit PoolGuard(SharedMemory *m) : memory(m) {
+    if (memory) {
+      auto selected = memory->stream.stream();
+      c10::cuda::CUDACachingAllocator::beginAllocateToPool(
+          memory->device, memory->transient.id(),
+          [selected](hipStream_t s) { return s == selected; });
+    }
+  }
+  ~PoolGuard() {
+    if (memory)
+      c10::cuda::CUDACachingAllocator::endAllocateToPool(
+          memory->device, memory->transient.id());
+  }
+};
+at::Tensor storage(SharedMemory *m, at::IntArrayRef sizes, int dev,
+                   at::ScalarType type = at::kByte) {
+  return m ? m->allocate(sizes, type) : at::empty(sizes, gpu(dev, type));
+}
 // Program handles and borrowed shapes stay alive together. All argument storage
 // is GPU-resident.
 struct Stage {
@@ -93,7 +186,8 @@ struct Stage {
   migraphx_program_parameters_t params = nullptr;
   std::map<std::string, at::Tensor> buffers;
   at::Tensor output;
-  Stage(const fs::path &path, int device, bool allocate = true) {
+  Stage(const fs::path &path, int device, bool allocate = true,
+        SharedMemory *shared = nullptr) {
     migraphx_file_options_t opts = nullptr;
     mg(migraphx_file_options_create(&opts));
     auto status = migraphx_load(&program, path.c_str(), opts);
@@ -105,16 +199,25 @@ struct Stage {
     mg(migraphx_program_parameter_shapes_size(&count, shapes));
     std::vector<const char *> names(count);
     mg(migraphx_program_parameter_shapes_names(names.data(), shapes));
-    if (allocate)
-      for (auto name : names) {
-        const_migraphx_shape_t sh;
-        mg(migraphx_program_parameter_shapes_get(&sh, shapes, name));
+    json memory;
+    if (shared)
+      memory = read_json(path.string() + ".memory.json");
+    for (auto name : names) {
+      const_migraphx_shape_t sh;
+      mg(migraphx_program_parameter_shapes_get(&sh, shapes, name));
+      if (shared && memory.at("parameters").at(name).contains("weight")) {
+        buffers[name] = shared->weight(memory["parameters"][name]["weight"]);
+        bind(name, buffers[name].data_ptr());
+      } else if (allocate ||
+                 (shared && std::string(name).find("eg2_workspace_") == 0)) {
         size_t bytes = 0;
         mg(migraphx_shape_bytes(&bytes, sh));
-        buffers[name] = at::empty({static_cast<int64_t>(bytes)}, gpu(device));
+        buffers[name] = storage(shared, {static_cast<int64_t>(bytes)}, device);
         bind(name, buffers[name].data_ptr());
       }
+    }
   }
+
   Stage(const Stage &) = delete;
   ~Stage() {
     if (params)
@@ -177,26 +280,30 @@ struct Vision {
   std::vector<std::map<std::string, at::Tensor>> views;
   at::Tensor output;
   std::unique_ptr<Stage> compiled;
-  Vision(const fs::path &bundle, const json &config, int dev) : device(dev) {
+  Vision(const fs::path &bundle, const json &config, int dev,
+         SharedMemory *shared = nullptr)
+      : device(dev) {
     segmented = config.at("kind") == "segmented";
     if (!segmented) {
       compiled = std::make_unique<Stage>(
-          bundle / config.at("path").get<std::string>(), device);
+          bundle / config.at("path").get<std::string>(), device, true, shared);
       return;
     }
     root = bundle / config.at("path").get<std::string>();
     m = read_json(root / "manifest.json");
     for (auto it = m["allocs"].begin(); it != m["allocs"].end(); ++it)
-      buffers[it.key()] = at::empty({span(it.value())}, gpu(device));
+      buffers[it.key()] = storage(shared, {span(it.value())}, device);
     for (auto it = m["params"].begin(); it != m["params"].end(); ++it)
       if (it.value()["parameter"] != "pixel_values")
-        buffers[it.key()] = at::empty({span(it.value()["shape"])}, gpu(device));
+        buffers[it.key()] =
+            storage(shared, {span(it.value()["shape"])}, device);
     for (auto &s : m["stages"])
       stages.push_back(std::make_unique<Stage>(
-          root / s["path"].get<std::string>(), device, false));
+          root / s["path"].get<std::string>(), device, false, shared));
     for (auto &e : m["events"]) {
-      weights.push_back(tensor_file(
-          root, m["weight_files"][e["weight"].get<std::string>()], device));
+      auto spec = m["weight_files"][e["weight"].get<std::string>()];
+      weights.push_back(shared ? shared->tensor(root, spec)
+                               : tensor_file(root, spec, device));
       std::map<std::string, at::Tensor> vv;
       for (auto it = e["tensors"].begin(); it != e["tensors"].end(); ++it)
         vv[it.key()] = view(it.value());
@@ -211,8 +318,11 @@ struct Vision {
     int64_t offset = d.at("offset");
     if (offset < 0 || offset + span(s) > b.numel())
       throw std::runtime_error("Out-of-range arena view");
-    return b.view(t).as_strided(s.at("lens").get<std::vector<int64_t>>(),
-                                s.at("strides").get<std::vector<int64_t>>(),
+    auto typed = b.view(t);
+    // as_strided takes an offset in the underlying storage, not in this view.
+    return typed.as_strided(s.at("lens").get<std::vector<int64_t>>(),
+                            s.at("strides").get<std::vector<int64_t>>(),
+                            typed.storage_offset() +
                                 offset / c10::elementSize(t));
   }
   at::Tensor run(const at::Tensor &patches, hipStream_t stream) {
@@ -255,22 +365,28 @@ struct Engine {
   fs::path root;
   json config;
   int device, batch, vbatch, budget, gh, gw, tokens;
+  SharedMemory *shared;
   Vision vision;
   Stage backbone;
   at::Tensor embeds, mask, rgb, patches, out;
   std::unique_ptr<at::cuda::CUDAGraph> graph;
-  Engine(fs::path p, int dev)
+  at::Tensor host_embeds, host_attention;
+  c10::cuda::CUDAStream execution_stream;
+  Engine(fs::path p, int dev, SharedMemory *memory = nullptr)
       : root(std::move(p)), config(read_json(root / "bundle.json")),
         device(dev), batch(config.at("batch")),
         vbatch(config.at("vision").at("batch")), budget(config.at("budget")),
         gh(config.at("vision").at("grid")[0]),
         gw(config.at("vision").at("grid")[1]),
-        tokens(config.at("vision").at("tokens")),
-        vision(root, config.at("vision"), dev),
+        tokens(config.at("vision").at("tokens")), shared(memory),
+        vision(root, config.at("vision"), dev, memory),
         backbone(root / config.at("backbone").at("path").get<std::string>(),
-                 dev) {
-    if (config.at("schema") != 1 || batch < 1 || batch > 128 || vbatch < 1 ||
-        batch % vbatch || gh % 3 || gw % 3 || tokens != gh * gw / 9)
+                 dev, true, memory),
+        execution_stream(memory ? memory->stream
+                                : c10::cuda::getStreamFromPool(false, dev)) {
+    if ((config.at("schema") != 1 && config.at("schema") != 2) || batch < 1 ||
+        batch > 128 || vbatch < 1 || batch % vbatch || gh % 3 || gw % 3 ||
+        tokens != gh * gw / 9)
       throw std::runtime_error("Invalid bundle dimensions");
     hipDeviceProp_t props;
     hip(hipGetDeviceProperties(&props, device));
@@ -283,15 +399,25 @@ struct Engine {
     if (embeds.sizes() != at::IntArrayRef({batch, tokens + 4, 512}) ||
         mask.sizes() != at::IntArrayRef({batch, tokens + 4}))
       throw std::runtime_error("Template shape mismatch");
-    patches = at::empty({batch, gh * gw, 768}, gpu(device, at::kFloat));
-    out = at::empty({batch, 768}, gpu(device, at::kFloat));
+    if (shared) {
+      host_embeds = embeds.cpu();
+      host_attention = mask.cpu();
+      embeds = storage(shared, {batch, tokens + 4, 512}, device, at::kFloat);
+      mask = storage(shared, {batch, tokens + 4}, device,
+                     host_attention.scalar_type());
+    }
+    patches = storage(shared, {batch, gh * gw, 768}, device, at::kFloat);
+    out = storage(shared, {batch, 768}, device, at::kFloat);
     backbone.bind("inputs_embeds", embeds.data_ptr());
     backbone.bind("attention_mask", mask.data_ptr());
   }
   void execute(hipStream_t stream) {
-    hip(static_cast<hipError_t>(eg2_patchify(rgb.data_ptr(), patches.data_ptr(),
-                                             batch, rgb.size(1), rgb.size(2),
-                                             gh, gw, stream)));
+    if (!shared)
+      hip(static_cast<hipError_t>(eg2_patchify_config(
+          rgb.data_ptr(), patches.data_ptr(), batch, rgb.size(1), rgb.size(2),
+          gh, gw, stream,
+          config.value("preprocess", json::object()).value("block", 256),
+          config.value("preprocess", json::object()).value("vector", 1))));
     for (int start = 0; start < batch; start += vbatch) {
       auto media = vision.run(patches.slice(0, start, start + vbatch), stream);
       embeds.slice(0, start, start + vbatch)
@@ -308,21 +434,40 @@ struct Engine {
     }
   }
   void encode(const uint8_t *data, int count, int h, int w, float *output) {
-    auto stream = c10::cuda::getStreamFromPool(false, device);
+    auto stream = execution_stream;
     c10::cuda::CUDAStreamGuard guard(stream);
-    bool shape_changed = !rgb.defined() || rgb.size(1) != h || rgb.size(2) != w;
-    if (shape_changed) {
+    if (shared) {
+      shared->activate(root.string());
+      embeds.copy_(host_embeds);
+      mask.copy_(host_attention);
+      size_t bytes = size_t(batch) * h * w * 3;
+      if (!shared->rgb.defined() || size_t(shared->rgb.numel()) < bytes)
+        shared->rgb = at::empty({static_cast<int64_t>(bytes)}, gpu(device));
+      rgb = shared->rgb.narrow(0, 0, bytes).view({batch, h, w, 3});
+      rgb.zero_();
+    } else if (!rgb.defined() || rgb.size(1) != h || rgb.size(2) != w) {
       graph.reset();
       rgb = at::zeros({batch, h, w, 3}, gpu(device));
     }
     hip(hipMemcpyAsync(rgb.data_ptr(), data, size_t(count) * h * w * 3,
                        hipMemcpyHostToDevice, stream.stream()));
-    if (!graph) {
-      for (int i = 0; i < 3; i++)
-        execute(stream.stream());
+    if (shared)
+      hip(static_cast<hipError_t>(eg2_patchify_config(
+          rgb.data_ptr(), patches.data_ptr(), batch, h, w, gh, gw,
+          stream.stream(),
+          config.value("preprocess", json::object()).value("block", 256),
+          config.value("preprocess", json::object()).value("vector", 1))));
+    const bool eager = std::getenv("EG2_DISABLE_GRAPHS") != nullptr;
+    if (!graph && !eager) {
+      {
+        PoolGuard pool(shared);
+        for (int i = 0; i < 3; i++)
+          execute(stream.stream());
+      }
       stream.synchronize();
       graph = std::make_unique<at::cuda::CUDAGraph>();
-      graph->capture_begin();
+      graph->capture_begin(shared ? shared->transient.id()
+                                  : at::cuda::MempoolId_t{0, 0});
       try {
         execute(stream.stream());
         graph->capture_end();
@@ -335,7 +480,11 @@ struct Engine {
         throw;
       }
     }
-    graph->replay();
+    if (eager) {
+      PoolGuard pool(shared);
+      execute(stream.stream());
+    } else
+      graph->replay();
     hip(hipMemcpyAsync(output, out.data_ptr(),
                        size_t(count) * 768 * sizeof(float),
                        hipMemcpyDeviceToHost, stream.stream()));
@@ -347,22 +496,24 @@ struct TextEngine {
   std::shared_ptr<torch::jit::Module> script;
   at::Tensor script_output;
   int batch, sequence, device;
+  SharedMemory *shared;
   at::Tensor ids, mask, host_ids, host_mask, embeds, embedding;
   double scale = 1.;
   bool native_embedding = false;
   std::unique_ptr<at::cuda::CUDAGraph> graph;
   TextEngine(const fs::path &root, const json &p, int dev,
              const at::Tensor &table, double embedding_scale,
-             std::shared_ptr<torch::jit::Module> script_module)
+             std::shared_ptr<torch::jit::Module> script_module,
+             SharedMemory *memory = nullptr)
       : script(std::move(script_module)), batch(p.at("batch")),
-        sequence(p.at("sequence")), device(dev) {
-    ids = at::zeros({batch, sequence}, gpu(dev, at::kLong));
-    mask = at::zeros_like(ids);
+        sequence(p.at("sequence")), device(dev), shared(memory) {
+    ids = storage(shared, {batch, sequence}, dev, at::kLong);
+    mask = storage(shared, {batch, sequence}, dev, at::kLong);
     host_ids =
         at::zeros({batch, sequence}, at::TensorOptions().dtype(at::kLong));
     host_mask = at::zeros_like(host_ids);
     if (script) {
-      script_output = at::empty({batch, 768}, gpu(dev, at::kFloat));
+      script_output = storage(shared, {batch, 768}, dev, at::kFloat);
       return;
     }
     stage =
@@ -379,7 +530,8 @@ struct TextEngine {
   }
   void encode(const int64_t *input, const int64_t *attention, int count,
               int length, float *out) {
-    auto stream = c10::cuda::getStreamFromPool(false, device);
+    auto stream =
+        shared ? shared->stream : c10::cuda::getStreamFromPool(false, device);
     c10::cuda::CUDAStreamGuard guard(stream);
     host_ids.zero_();
     host_mask.zero_();
@@ -401,6 +553,10 @@ struct TextEngine {
         stage->run(stream.stream());
     };
     if (script) {
+      PoolGuard pool(shared);
+      if (shared)
+        shared->activate("text:" + std::to_string(batch) + ":" +
+                         std::to_string(sequence));
       execute();
     } else {
       if (!graph) {
@@ -443,6 +599,7 @@ struct eg2_context {
   at::Tensor text_embedding;
   int device;
   std::mutex mutex;
+  std::unique_ptr<SharedMemory> shared;
   std::map<std::string, std::unique_ptr<Engine>> engines;
   std::map<std::string, std::unique_ptr<TextEngine>> text_engines;
   std::map<std::string, std::shared_ptr<torch::jit::Module>> script_modules;
@@ -464,7 +621,7 @@ struct eg2_context {
                       {"batch", b.at("batch")},
                       {"aspect", b.value("aspect", json::array({16, 9}))}}})}};
     }
-    if (index.value("schema", 0) != 1 ||
+    if ((index.value("schema", 0) != 1 && index.value("schema", 0) != 2) ||
         !index.value("profiles", json::array()).is_array())
       throw std::runtime_error("Invalid bundle index schema");
     hipDeviceProp_t props{};
@@ -505,10 +662,36 @@ struct eg2_context {
     }
     if (index.contains("tokenizer"))
       relative(index.at("tokenizer"));
+    if (index.value("schema", 0) == 2) {
+      for (auto &entry : index.at("shared").at("weights"))
+        relative(entry.at("file"));
+      shared = std::make_unique<SharedMemory>(root, index.at("shared"), device);
+    }
   }
 };
 extern "C" {
 const char *eg2_version() { return "0.1.0"; }
+eg2_status eg2_device_info(int device, char *out, size_t cap) {
+  try {
+    hipDeviceProp_t p{};
+    hip(hipGetDeviceProperties(&p, device));
+    json data = {{"arch", p.gcnArchName},
+                 {"name", p.name},
+                 {"wave_size", p.warpSize},
+                 {"compute_units", p.multiProcessorCount},
+                 {"max_threads_per_block", p.maxThreadsPerBlock},
+                 {"shared_memory_per_block", p.sharedMemPerBlock},
+                 {"total_memory", p.totalGlobalMem}};
+    auto text = data.dump();
+    if (!out || cap <= text.size())
+      return EG2_INVALID_ARGUMENT;
+    std::memcpy(out, text.c_str(), text.size() + 1);
+    return EG2_OK;
+  } catch (const std::exception &e) {
+    error_message(out, cap, e.what());
+    return EG2_RUNTIME_ERROR;
+  }
+}
 eg2_status eg2_create(const char *path, int device, eg2_context **out,
                       char *err, size_t cap) {
   if (!out || !path || device < 0) {
@@ -519,6 +702,8 @@ eg2_status eg2_create(const char *path, int device, eg2_context **out,
   try {
     c10::InferenceMode inference;
     hip(hipSetDevice(device));
+    // MemPool requires LibTorch allocator initialization even in a C-only host.
+    at::globalContext().lazyInitDevice(at::kCUDA);
     at::set_num_threads(4);
     *out = new eg2_context(path, device);
     return EG2_OK;
@@ -588,12 +773,15 @@ eg2_status eg2_encode_images(eg2_context *ctx, const uint8_t *data,
       return EG2_UNSUPPORTED;
     }
     std::string key = selected.at("path");
-    if (!ctx->engines.count(key)) {
+    if (!ctx->shared && !ctx->engines.count(key))
       ctx->engines.clear();
-    }
     auto &engine = ctx->engines[key];
-    if (!engine)
-      engine = std::make_unique<Engine>(ctx->root / key, ctx->device);
+    if (!engine) {
+      if (ctx->shared)
+        ctx->shared->reset();
+      engine = std::make_unique<Engine>(ctx->root / key, ctx->device,
+                                        ctx->shared.get());
+    }
     for (size_t start = 0; start < batch; start += best)
       engine->encode(data + start * h * w * 3, std::min(best, batch - start), h,
                      w, out + start * 768);
@@ -673,7 +861,7 @@ eg2_status eg2_encode_tokens(eg2_context *ctx, const int64_t *ids,
     std::string key = path + "|" +
                       std::to_string(selected.at("batch").get<int>()) + "|" +
                       std::to_string(selected.at("sequence").get<int>());
-    if (!ctx->text_engines.count(key)) {
+    if (!ctx->shared && !ctx->text_engines.count(key)) {
       ctx->text_engines.clear();
       if (!ctx->script_modules.count(path))
         ctx->script_modules.clear();
@@ -681,6 +869,8 @@ eg2_status eg2_encode_tokens(eg2_context *ctx, const int64_t *ids,
     auto &engine = ctx->text_engines[key];
     if (!engine)
       engine = ([&]() {
+        if (ctx->shared)
+          ctx->shared->reset();
         if (selected.value("embedding", std::string()) == "native" &&
             !ctx->text_embedding.defined())
           ctx->text_embedding = tensor_file(
@@ -689,9 +879,26 @@ eg2_status eg2_encode_tokens(eg2_context *ctx, const int64_t *ids,
         if (selected.value("kind", std::string()) == "torchscript") {
           auto &cached = ctx->script_modules[path];
           if (!cached) {
-            cached = std::make_shared<torch::jit::Module>(
-                torch::jit::load((ctx->root / path).string(),
-                                 at::Device(at::kCUDA, ctx->device)));
+            cached = std::make_shared<torch::jit::Module>(torch::jit::load(
+                (ctx->root / path).string(),
+                at::Device(ctx->shared ? at::kCPU : at::kCUDA, ctx->device)));
+            if (ctx->shared) {
+              auto specs = ctx->index.at("shared").at("text_weights").at(path);
+              for (auto item : cached->named_parameters(true)) {
+                auto spec = specs.at("parameters").at(item.name);
+                auto value = ctx->shared->weight(spec.at("weight"))
+                                 .view(item.value.scalar_type())
+                                 .view(item.value.sizes());
+                item.value.set_data(value);
+              }
+              for (auto item : cached->named_buffers(true)) {
+                auto spec = specs.at("buffers").at(item.name);
+                auto value = ctx->shared->weight(spec.at("weight"))
+                                 .view(item.value.scalar_type())
+                                 .view(item.value.sizes());
+                item.value.set_data(value);
+              }
+            }
             cached->eval();
           }
           module = cached;
@@ -700,7 +907,7 @@ eg2_status eg2_encode_tokens(eg2_context *ctx, const int64_t *ids,
             ctx->root, selected, ctx->device, ctx->text_embedding,
             ctx->index.value("text_embedding", json::object())
                 .value("scale", 1.),
-            module);
+            module, ctx->shared.get());
       })();
     size_t b = selected.at("batch");
     for (size_t start = 0; start < count; start += b)
@@ -777,6 +984,47 @@ eg2_status eg2_encode_texts(eg2_context *ctx, const char *const *texts,
     return EG2_RUNTIME_ERROR;
   }
 }
+eg2_status eg2_prepare(eg2_context *ctx, char *err, size_t cap) {
+  if (!ctx) {
+    error_message(err, cap, "Invalid context");
+    return EG2_INVALID_ARGUMENT;
+  }
+  try {
+    for (auto &p : ctx->index.value("profiles", json::array())) {
+      size_t b = p.at("batch");
+      int budget = p.at("budget");
+      if (budget == 280 && b > 32)
+        continue;
+      auto aspect = p.value("aspect", json::array({16, 9}));
+      if (aspect.is_null())
+        aspect = json::array({16, 9});
+      size_t w = aspect[0].get<size_t>(), h = aspect[1].get<size_t>();
+      size_t scale = std::min(
+          size_t(16), std::max(size_t(1), size_t(512) / std::max(w, h)));
+      w *= scale;
+      h *= scale;
+      std::vector<uint8_t> input(b * h * w * 3, 127);
+      std::vector<float> output(b * 768);
+      auto status = eg2_encode_images(ctx, input.data(), b, h, w, budget,
+                                      output.data(), output.size(), err, cap);
+      if (status != EG2_OK)
+        return status;
+    }
+    for (auto &p : ctx->index.value("text_profiles", json::array())) {
+      size_t b = p.at("batch"), l = p.at("sequence");
+      std::vector<int64_t> ids(b * l, 1), mask(b * l, 1);
+      std::vector<float> output(b * 768);
+      auto status = eg2_encode_tokens(ctx, ids.data(), mask.data(), b, l,
+                                      output.data(), output.size(), err, cap);
+      if (status != EG2_OK)
+        return status;
+    }
+    return EG2_OK;
+  } catch (const std::exception &e) {
+    error_message(err, cap, e.what());
+    return EG2_RUNTIME_ERROR;
+  }
+}
 eg2_status eg2_info(eg2_context *ctx, char *out, size_t cap) {
   if (!ctx || !out)
     return EG2_INVALID_ARGUMENT;
@@ -784,9 +1032,40 @@ eg2_status eg2_info(eg2_context *ctx, char *out, size_t cap) {
     std::lock_guard<std::mutex> lock(ctx->mutex);
     auto info = ctx->index;
     info["last_execution"] = ctx->last;
+    info.erase("shared");
+    if (ctx->shared) {
+      auto &m = *ctx->shared;
+      size_t transient_reserved = 0, transient_allocated = 0;
+      for (const auto &segment :
+           c10::cuda::CUDACachingAllocator::snapshot().segments)
+        if (segment.device == ctx->device &&
+            segment.owner_private_pool_id == m.transient.id()) {
+          transient_reserved += segment.total_size;
+          transient_allocated += segment.allocated_size;
+        }
+      info["memory"] = {
+          {"mode", "shared"},
+          {"weight_bytes", m.weights_bytes},
+          {"transient_reserved_bytes", transient_reserved},
+          {"transient_allocated_bytes", transient_allocated},
+          {"weight_allocations", m.weights.size()},
+          {"workspace_bytes", m.arena.nbytes()},
+          {"rgb_capacity_bytes", m.rgb.defined() ? m.rgb.nbytes() : 0},
+          {"profile_switches", m.switches},
+          {"resident_image_profiles", ctx->engines.size()},
+          {"resident_text_profiles", ctx->text_engines.size()},
+          {"resident_text_modules", ctx->script_modules.size()}};
+    } else
+      info["memory"] = {{"mode", "legacy"}};
     hipDeviceProp_t props{};
     if (hipGetDeviceProperties(&props, ctx->device) == hipSuccess)
       info["gpu"] = {{"name", props.name}, {"arch", props.gcnArchName}};
+    size_t free_bytes = 0, total_bytes = 0;
+    if (hipMemGetInfo(&free_bytes, &total_bytes) == hipSuccess)
+      info["device_memory"] = {
+          {"free_bytes", free_bytes},
+          {"total_bytes", total_bytes},
+          {"scope", "whole device, including other processes"}};
     int version = 0;
     if (hipRuntimeGetVersion(&version) == hipSuccess)
       info["hip_runtime_version"] = version;

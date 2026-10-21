@@ -32,8 +32,15 @@ def write_json(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", dir=path.parent, delete=False) as f:
         json.dump(data, f, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
         name = f.name
     os.replace(name, path)
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
 
 
 def read_index(root):
@@ -419,6 +426,44 @@ def export_fixed_backbone(model, source, batch):
     return path
 
 
+def export_custom_vision(model, source, batch):
+    import torch, onnx
+    from ._compiler.recipe import mixed_vision, static_vision
+
+    source = Path(source)
+    legacy = source / "vision-fast-v3-b16.onnx"
+    if batch == 16 and legacy.exists():
+        return legacy
+    path = source / f"vision-custom-v4-b{batch}.onnx"
+    if path.exists():
+        return path
+    export = json.loads((source / "export.json").read_text())
+    gh, gw = export["grid"]
+    y, x = torch.meshgrid(torch.arange(gh), torch.arange(gw), indexing="ij")
+    positions = torch.stack((x, y), dim=-1).reshape(1, gh * gw, 2)
+    pixels = torch.from_numpy(np.load(source / "pixels.npy")).repeat(batch, 1, 1)
+    st = load_model(model)
+    mixed_vision(st[0].model)
+    with torch.inference_mode():
+        fast = static_vision(st[0].model, positions, batch)
+        temporary = path.with_suffix(".partial.onnx")
+        torch.onnx.export(
+            fast,
+            (pixels,),
+            str(temporary),
+            dynamo=False,
+            opset_version=18,
+            input_names=["pixel_values"],
+            output_names=["output"],
+            external_data=True,
+        )
+        onnx.checker.check_model(str(temporary))
+        os.replace(temporary, path)
+    del st, fast
+    gc.collect()
+    return path
+
+
 def compile_images(
     model,
     output,
@@ -428,14 +473,21 @@ def compile_images(
     precision="fast",
     vision_batch=None,
     cache_dirs=(),
+    kernel_config=None,
+    tuning_profile=None,
+    use_presets=True,
 ):
     import torch
     import migraphx
 
     aspect = normalized_aspect(aspect)
     output = Path(output).resolve()
-    exports = export_images(model, output / "exports", budgets, aspect)
     index = read_index(output)
+    if index.get("schema") != 1:
+        raise ValueError(
+            "Prepare profiles in a schema-1 source bundle, then convert with eg2 share"
+        )
+    exports = export_images(model, output / "exports", budgets, aspect)
     device = torch.cuda.get_device_properties(0)
     arch = device.gcnArchName.split(":")[0]
     base_fingerprint = dict(
@@ -448,6 +500,9 @@ def compile_images(
         precision=precision,
         model_revision=MODEL_REVISION,
     )
+    from .presets import environment, select, profile_key
+
+    env = environment() if use_presets or tuning_profile else None
     for e in exports:
         source = output / "exports" / e["directory"]
         # The full 128-image/268-token compiled backbone crashed on gfx1150.
@@ -461,7 +516,31 @@ def compile_images(
             ]
         execution_batches = sorted({min(batch, limit) for batch in batches})
         for batch in execution_batches:
-            vb = min(batch, vision_batch or (4 if e["budget"] == 280 else 16))
+            selected = (
+                select(
+                    profile_key(e["budget"], batch, aspect, precision),
+                    env,
+                    tuning_profile,
+                )
+                if env and kernel_config is None
+                else None
+            )
+            recipe = kernel_config
+            selected_vb = vision_batch
+            if selected:
+                if (
+                    vision_batch is not None
+                    and vision_batch != selected["vision_batch"]
+                ):
+                    if tuning_profile:
+                        raise ValueError(
+                            "Explicit vision batch conflicts with tuning recipe"
+                        )
+                    selected = None
+                else:
+                    recipe = selected["kernel_config"]
+                    selected_vb = selected["vision_batch"]
+            vb = min(batch, selected_vb or (4 if e["budget"] == 280 else 16))
             while batch % vb:
                 vb -= 1
             specialized = (
@@ -471,9 +550,20 @@ def compile_images(
                 and arch == "gfx1150"
                 and list(aspect) == [16, 9]
             )
-            revision = 3 if specialized else 2
+            revision = 4 if recipe is not None else (3 if specialized else 2)
             fingerprint = dict(base_fingerprint, recipe_revision=revision)
+            if recipe is not None:
+                from .presets import recipe_digest
+
+                fingerprint.update(kernel_config=recipe, recipe_sha256=recipe_digest())
             label = f"{arch}-budget{e['budget']}-b{batch}-aspect{aspect[0]}x{aspect[1]}-{precision}-v{vb}-r{revision}"
+            if recipe is not None:
+                label += (
+                    "-"
+                    + hashlib.sha256(
+                        json.dumps(recipe, sort_keys=True).encode()
+                    ).hexdigest()[:12]
+                )
             dest = output / label
             dest.mkdir(parents=True, exist_ok=True)
             old = dest / "fingerprint.json"
@@ -497,14 +587,23 @@ def compile_images(
                     continue
                 batch_pattern = "*" if stage == "vision" else str(batch)
                 vision_pattern = str(vb) if stage == "vision" else "*"
-                pattern = f"{arch}-budget{e['budget']}-b{batch_pattern}-aspect{aspect[0]}x{aspect[1]}-{precision}-v{vision_pattern}-r{revision}/{stage}.mxr"
+                pattern = f"{arch}-budget{e['budget']}-b{batch_pattern}-aspect{aspect[0]}x{aspect[1]}-{precision}-v{vision_pattern}-r{revision}*/{stage}.mxr"
                 for cache_dir in [output, *map(Path, cache_dirs)]:
                     for cached in sorted(cache_dir.glob(pattern)):
                         metadata = cached.parent / "fingerprint.json"
                         if (
                             cached != path
                             and metadata.exists()
-                            and json.loads(metadata.read_text()) == fingerprint
+                            and {
+                                k: v
+                                for k, v in json.loads(metadata.read_text()).items()
+                                if k != "kernel_config"
+                            }
+                            == {
+                                k: v
+                                for k, v in fingerprint.items()
+                                if k != "kernel_config"
+                            }
                         ):
                             temporary = path.with_suffix(".partial.mxr")
                             shutil.copy2(cached, temporary)
@@ -531,6 +630,12 @@ def compile_images(
                     if specialized
                     else source / (stage + ".onnx")
                 )
+                if recipe is not None:
+                    onnx_path = (
+                        export_custom_vision(model, source, vb)
+                        if stage == "vision"
+                        else export_fixed_backbone(model, source, batch)
+                    )
                 p = compile_onnx(onnx_path, shapes, precision)
                 temporary = path.with_suffix(".partial.mxr")
                 migraphx.save(p, str(temporary))
@@ -555,7 +660,39 @@ def compile_images(
                 grid=e["grid"],
                 tokens=e["tokens"],
             )
-            if (
+            if recipe is not None:
+                from ._compiler.recipe import optimize
+
+                try:
+                    result = optimize(
+                        dest / "vision.mxr",
+                        dest / "optimized",
+                        arch,
+                        batch=vb,
+                        patches=e["grid"][0] * e["grid"][1],
+                        config=recipe,
+                    )
+                    vision_config.update(
+                        kind="segmented" if result.is_dir() else "compiled",
+                        path=str(result.relative_to(dest)),
+                    )
+                except (
+                    ValueError,
+                    AssertionError,
+                    RuntimeError,
+                    __import__("subprocess").SubprocessError,
+                ) as error:
+                    if not selected or tuning_profile:
+                        raise
+                    print(
+                        "Published recipe failed its graph/compiler guards; "
+                        "retaining the compiled GPU path:",
+                        error,
+                        flush=True,
+                    )
+                    selected = None
+                    recipe = None
+            elif (
                 e["budget"] == 70
                 and vb == 16
                 and precision == "fast"
@@ -592,6 +729,13 @@ def compile_images(
                 backbone=dict(path="backbone.mxr", batch=batch),
                 tensors=tensors,
                 fingerprint=fingerprint,
+                preprocess=(recipe or {}).get("preprocess")
+                or dict(block=256, vector=1),
+                tuning_source="published"
+                if selected
+                else "explicit"
+                if recipe is not None
+                else "default",
             )
             write_json(dest / "bundle.json", bundle)
             entry = dict(
@@ -627,6 +771,10 @@ def prepare_text(
     import torch
 
     output = Path(output).resolve()
+    if read_index(output).get("schema") != 1:
+        raise ValueError(
+            "Prepare text in a schema-1 source bundle, then convert with eg2 share"
+        )
     directory = output / "exports/text-native"
     directory.mkdir(parents=True, exist_ok=True)
     path = output / f"text-{precision}-v5.pt"

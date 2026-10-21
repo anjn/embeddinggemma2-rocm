@@ -27,6 +27,8 @@ def create_app(
             embedder_factory, bundle, device, library
         )
         try:
+            if state["model"].capabilities.get("schema") == 2:
+                await asyncio.to_thread(state["model"].prepare)
             if state["model"].capabilities.get("text_profiles"):
                 await asyncio.to_thread(
                     state["model"].encode_texts, ["warmup"], prompt="query"

@@ -21,8 +21,12 @@ typedef enum {
    serialize. Input/output buffers belong to the caller. No Python interpreter
    is required. */
 EG2_API const char *eg2_version(void);
+EG2_API eg2_status eg2_device_info(int device, char *output, size_t capacity);
 EG2_API eg2_status eg2_create(const char *bundle_path, int device,
                               eg2_context **out, char *error, size_t capacity);
+/* Initialize and warm every registered profile, serialized on this context. */
+EG2_API eg2_status eg2_prepare(eg2_context *context, char *error,
+                               size_t capacity);
 EG2_API void eg2_destroy(eg2_context *context);
 /* RGB is contiguous [batch,height,width,3]. Output has batch*768 float
    elements. First call for a shape warms up/captures the graph; exclude it from

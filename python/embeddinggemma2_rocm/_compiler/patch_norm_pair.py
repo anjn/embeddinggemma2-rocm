@@ -7,6 +7,10 @@ p = argparse.ArgumentParser()
 p.add_argument("--source", required=True)
 p.add_argument("--binary", required=True)
 p.add_argument("--output", required=True)
+p.add_argument("--patches", type=int, default=594)
+p.add_argument("--batch", type=int, default=16)
+p.add_argument("--lanes", type=int, choices=(4,8,16,32,64), default=32)
+p.add_argument("--block", type=int, choices=(64,128,256,512), default=256)
 a = p.parse_args()
 source = Path(a.source)
 binary = Path(a.binary)
@@ -20,7 +24,7 @@ for second in nodes:
     if (
         second["name"] != "gpu::code_object"
         or second["operator"]["symbol_name"] != b
-        or second["shape"]["lens"] != [16, 594, 768]
+        or second["shape"]["lens"] != [a.batch, a.patches, 768]
     ):
         continue
     first = mp[second["inputs"][0]]
@@ -37,7 +41,7 @@ for first, second in pairs:
     out1 = mp[first["inputs"][-1]]
     out2 = mp[second["inputs"][-1]]
     assert out1["name"] == out2["name"] == "load" and out1["inputs"] == out2["inputs"]
-    size = 16 * 594 * 768 * 2
+    size = a.batch * a.patches * 768 * 2
     assert abs(out1["operator"]["offset"] - out2["operator"]["offset"]) >= size
     pre = copy.deepcopy(out2)
     pre["output"] = "norm_pair_dest_" + second["output"]
@@ -47,10 +51,10 @@ for first, second in pairs:
     op["expected_inputs"].append(copy.deepcopy(second["shape"]))
     op.update(
         code_object=code,
-        symbol_name="hip_norm_pair",
+        symbol_name=f"hip_norm_pair_l{a.lanes}",
         output_arg=3,
-        local=256,
-        **{"global": ((16 * 594 * 32 + 255) // 256) * 256},
+        local=a.block,
+        **{"global": ((a.batch * a.patches * a.lanes + a.block - 1) // a.block) * a.block},
     )
     al = copy.deepcopy(out2)
     al["output"] = second["output"]

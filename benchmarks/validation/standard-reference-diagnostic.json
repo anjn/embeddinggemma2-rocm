@@ -1,0 +1,33 @@
+{
+  "profile": {
+    "budget": 70,
+    "batch": 1,
+    "aspect": [
+      16,
+      9
+    ]
+  },
+  "environment": {
+    "device": {
+      "arch": "gfx1150",
+      "name": "AMD Radeon 890M",
+      "wave_size": 32,
+      "compute_units": 8
+    },
+    "limits": {
+      "max_threads_per_block": 1024,
+      "shared_memory_per_block": 65536,
+      "total_memory": 25769803776
+    },
+    "software": {
+      "torch": "2.14.1+rocm7.2",
+      "rocm": "7.2.53211",
+      "migraphx": "2.15.0.dev+20250912-17-195-g1afd1b89c"
+    },
+    "recipe_sha256": "a996704001c373656b1b6e6f6f5e27778611562c29b2f285a17328509ed8c102"
+  },
+  "compiled_standard_cosine_to_cpu_fp32": 0.9400132894515991,
+  "candidate_cosine_to_cpu_fp32": 0.9999247193336487,
+  "decision": "Use independent CPU FP32 calibration; do not use this compiled standard batch1 reference to select kernels",
+  "root_cause": "Not established"
+}

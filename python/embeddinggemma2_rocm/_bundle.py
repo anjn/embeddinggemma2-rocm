@@ -30,6 +30,9 @@ def bundle_digest(directory):
     files.update(root / profile["path"] for profile in index.get("text_profiles", []))
     if index.get("tokenizer"):
         files.add(root / index["tokenizer"])
+    if index.get("schema") == 2:
+        files.update(root / spec["file"] for spec in index["shared"]["weights"].values())
+        files.update(Path(str(path)+".memory.json") for path in list(files) if path.suffix == ".mxr")
     digest = hashlib.sha256()
     for path in sorted(files):
         relative = path.resolve().relative_to(root).as_posix()

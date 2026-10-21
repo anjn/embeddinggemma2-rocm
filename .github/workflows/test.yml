@@ -10,7 +10,7 @@ jobs:
           python-version: '3.12'
       - run: pip install '.[server,test]'
       - run: python -m compileall -q python benchmarks tests
-      - run: pytest -q tests/test_api.py
+      - run: pytest -q
   tokenizer:
     runs-on: ubuntu-24.04
     steps:

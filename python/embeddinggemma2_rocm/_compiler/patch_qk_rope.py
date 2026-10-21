@@ -10,11 +10,13 @@ p.add_argument("--batch", type=int, default=16)
 p.add_argument("--round", action="store_true")
 p.add_argument("--gelu-round", action="store_true")
 p.add_argument("--all-layers", action="store_true")
-p.add_argument("--lanes", type=int, choices=(4, 8, 16, 32), default=32)
+p.add_argument("--lanes", type=int, choices=(4, 8, 16, 32, 64), default=32)
 p.add_argument("--source", required=True)
 p.add_argument("--binary", required=True)
 p.add_argument("--output", required=True)
 p.add_argument("--proof")
+p.add_argument("--patches", type=int, default=594)
+p.add_argument("--block", type=int, choices=(64,128,256,512), default=128)
 a = p.parse_args()
 assert a.lanes == 32 or a.round
 source = Path(a.source)
@@ -26,11 +28,11 @@ code = list(Path(a.binary).read_bytes())
 shapeq = {
     "type": "bf16_type",
     "sub_shapes": [],
-    "lens": [a.batch, 594, 12, 64],
-    "strides": [456192, 768, 64, 1],
+    "lens": [a.batch, a.patches, 12, 64],
+    "strides": [a.patches * 768, 768, 64, 1],
     "dynamic_dimensions": [],
 }
-shapez = {**shapeq, "lens": [a.batch, 594, 2304], "strides": [1368576, 2304, 1]}
+shapez = {**shapeq, "lens": [a.batch, a.patches, 2304], "strides": [a.patches * 2304, 2304, 1]}
 alloc = []
 for name, shape in [
     ("hip_fused_z", shapez),
@@ -126,20 +128,16 @@ for attn in nodes:
         gemm["inputs"][-1] = "hip_fused_z"
         gemms.add(current)
         for coeff in (sin, cos):
-            assert mp[coeff]["shape"]["strides"] == [38016, 64, 0, 1] and mp[coeff][
+            assert mp[coeff]["shape"]["strides"] == [a.patches * 64, 64, 0, 1] and mp[coeff][
                 "shape"
-            ]["lens"] == [a.batch, 594, 12, 64]
+            ]["lens"] == [a.batch, a.patches, 12, 64]
         args = [raw, w, cos, sin, "hip_fused_q" if index == 0 else "hip_fused_k"]
         n["inputs"] = args
         n["operator"] = {
             "code_object": code,
-            "symbol_name": (
-                f"hip_norm_rope_l{a.lanes}"
-                if a.lanes != 32
-                else ("hip_norm_rope_round" if a.round else "hip_norm_rope")
-            ),
-            "global": (a.batch * 594) * 12 * a.lanes,
-            "local": 128,
+            "symbol_name": f"hip_norm_rope_l{a.lanes}",
+            "global": ((a.batch * a.patches * 12 * a.lanes + a.block - 1) // a.block) * a.block,
+            "local": a.block,
             "expected_inputs": [mp[i]["shape"] for i in args],
             "output": shapeq,
             "output_arg": -1,
@@ -184,7 +182,7 @@ record = {
     "layers": len(gemms),
     "old_nodes": len(nodes),
     "new_nodes": len(newnodes),
-    "extra_workspace_bytes": (a.batch * 594) * (2304 + 768 * 2) * 2,
+    "extra_workspace_bytes": (a.batch * a.patches) * (2304 + 768 * 2) * 2,
     "round_products": a.round,
     "lanes": a.lanes,
 }

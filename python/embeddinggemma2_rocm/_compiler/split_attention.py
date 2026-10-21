@@ -10,6 +10,7 @@ parser.add_argument("--ffn-up", action="store_true")
 parser.add_argument("--batch", type=int, default=16)
 parser.add_argument("--source", required=True)
 parser.add_argument("--output-dir", required=True)
+parser.add_argument("--patches", type=int, default=594)
 cli = parser.parse_args()
 source = Path(cli.source)
 v = msgpack.unpackb(source.read_bytes(), raw=False)
@@ -21,7 +22,7 @@ assert next(
     n["shape"]["lens"]
     for n in nodes
     if n["name"] == "@param" and n["operator"]["parameter"] == "pixel_values"
-) == [cli.batch, 594, 768]
+) == [cli.batch, cli.patches, 768]
 allowed = {
     "@param",
     "@return",

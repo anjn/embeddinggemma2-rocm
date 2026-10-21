@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "kind": "hip_tuning_recipe",
+  "environment": {
+    "device": {
+      "arch": "gfx1150",
+      "name": "AMD Radeon 890M",
+      "wave_size": 32,
+      "compute_units": 8
+    },
+    "limits": {
+      "max_threads_per_block": 1024,
+      "shared_memory_per_block": 65536,
+      "total_memory": 25769803776
+    },
+    "software": {
+      "torch": "2.14.1+rocm7.2",
+      "rocm": "7.2.53211",
+      "migraphx": "2.15.0.dev+20250912-17-195-g1afd1b89c"
+    },
+    "recipe_sha256": "a996704001c373656b1b6e6f6f5e27778611562c29b2f285a17328509ed8c102"
+  },
+  "profile": {
+    "model_revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+    "budget": 70,
+    "batch": 1,
+    "aspect": [
+      16,
+      9
+    ],
+    "precision": "fast"
+  },
+  "vision_batch": 1,
+  "kernel_config": {
+    "gelu": {
+      "block": 128,
+      "vector": 4
+    },
+    "qk": {
+      "block": 128,
+      "lanes": 16,
+      "packed": true
+    },
+    "norm": null,
+    "preprocess": null,
+    "segmented": false
+  },
+  "measurement": {
+    "ms_per_image": 35.73748000002297,
+    "input_sha256": "9b36a6e72d7989f2b0f6f79d5305b512bd955fcd73d71499fe148cca0135b36f",
+    "search_sha256": "3046445cdc1ade7db0ebaa4d85887f6c8ba54ba8d45692150e6f8b3e50550e39",
+    "search": {
+      "vision_batches": [
+        1
+      ],
+      "kernels": {
+        "1": {
+          "gelu": {
+            "attempted": 20,
+            "passed": 20
+          },
+          "qk": {
+            "attempted": 20,
+            "passed": 20
+          },
+          "norm": {
+            "attempted": 16,
+            "passed": 16
+          },
+          "preprocess": {
+            "attempted": 20,
+            "passed": 20
+          }
+        }
+      },
+      "pipeline_attempted": 33,
+      "pipeline_compiled": 17
+    }
+  },
+  "validation": {
+    "numeric_pass": true,
+    "numeric_reference": "cpu_fp32_native_bilinear",
+    "retrieval_pass": true,
+    "min_cosine_to_standard": 0.9999247193336487,
+    "retrieval": {
+      "text_to_image": 86.484375,
+      "image_to_text": 93.359375
+    },
+    "reference_retrieval": {
+      "text_to_image": 86.25,
+      "image_to_text": 94.140625
+    },
+    "images": 256,
+    "captions": 1280,
+    "manifest_sha256": "3d3aced14affedefb32c3a15387335c82f779352a4fa34cb232081035c5f2c6c",
+    "loss_percentage_points": {
+      "text_to_image": -0.234375,
+      "image_to_text": 0.78125
+    },
+    "input_sha256": "62f0a0c9c7ef269a52ee440c48ee2a0d3f37facbd01761bf08d6874ff4ea5d02"
+  }
+}

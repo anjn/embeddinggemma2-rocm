@@ -26,6 +26,6 @@ extern "C" __global__ void hip_norm_rope_packed4(const unsigned short*x,const fl
  *reinterpret_cast<uint2*>(y+row*64+c)=out.bits;
 }
 extern "C" int test_packed(void*x,void*w,void*c,void*s,void*y,int block,void*stream){
- hipLaunchKernelGGL(hip_norm_rope_packed4,dim3(ROWS*12*16/block),dim3(block),0,(hipStream_t)stream,(unsigned short*)x,(float*)w,(unsigned short*)c,(unsigned short*)s,(unsigned short*)y);
+ hipLaunchKernelGGL(hip_norm_rope_packed4,dim3((ROWS*12*16+block-1)/block),dim3(block),0,(hipStream_t)stream,(unsigned short*)x,(float*)w,(unsigned short*)c,(unsigned short*)s,(unsigned short*)y);
  return hipGetLastError();
 }

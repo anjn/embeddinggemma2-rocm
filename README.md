@@ -8,6 +8,8 @@ Image inference uses HIP preprocessing, MIGraphX programs, and LibTorch attentio
 
 The specialized image recipe targets Radeon 890M (`gfx1150`), budget 70, 16:9 images and vision chunks of 16. Other shapes use the generic compiled path. Other AMD GPUs require their own compilation and validation; they have not been tested here. Models and compiled bundles are downloaded/generated separately.
 
+Multiple image and text profiles can share GPU weights and a maximum-size workspace with `eg2 share`. The HIP tuner searches per-profile kernel settings and can publish validated GPU recipes under `profiles/gpus/`; compatible machines reuse settings without a search. See [tuning and shared profiles](docs/tuning.md).
+
 ## Build and prepare
 
 Linux, a supported AMD GPU, Docker, and a working ROCm host driver are required for the container workflow. Obtain access to the model and accept its upstream terms before downloading it. Set `HF_TOKEN` in the shell if authentication is required.
@@ -33,6 +35,10 @@ docker run --rm --device=/dev/kfd --device=/dev/dri \
   -v "$PWD/models:/data/models:ro" -v "$PWD/artifacts:/data/artifacts" \
   embeddinggemma2-rocm:local prepare-text --model models/google \
   --output artifacts/my-gpu --batches 1 4 --lengths 32 128
+
+docker run --rm -v "$PWD/artifacts:/data/artifacts" \
+  embeddinggemma2-rocm:local share --bundle artifacts/my-gpu \
+  --output artifacts/my-gpu-shared
 ```
 
 For budget 70, batch 32/128 on gfx1150, the preparation tool selects vision chunks of 16 and attempts the guarded specialized recipe. Inspect preparation output: failed optimization guards retain the compiled fallback. Prepare other aspect ratios with `--aspect WIDTH HEIGHT`; an unprepared ratio returns an unsupported-profile error. There is no implicit crop or distortion to 16:9. Once prepared, serving can run offline with only the bundle mounted.
@@ -45,7 +51,7 @@ See [source builds](docs/build.md), [interfaces](docs/api.md), and [tuning and v
 import numpy as np
 from embeddinggemma2_rocm import Embedder
 
-with Embedder("artifacts/my-gpu") as model:
+with Embedder("artifacts/my-gpu-shared") as model:
     rgb = np.zeros((4, 288, 512, 3), dtype=np.uint8)
     image_vectors = model.encode_images(rgb, token_budget=70)
     query_vectors = model.encode_texts(["a cat", "a street"], prompt="query")
@@ -56,7 +62,7 @@ Set `EG2_LIBRARY_PATH` to the built or installed `libeg2.so`. All images in one 
 
 ```cpp
 #include <eg2/eg2.hpp>
-eg2::Context model("artifacts/my-gpu");
+eg2::Context model("artifacts/my-gpu-shared");
 auto vectors = model.texts({"a cat", "a street"});
 ```
 
@@ -68,7 +74,7 @@ The [C header](include/eg2/eg2.h) documents buffer ownership and errors; [exampl
 docker run --rm --device=/dev/kfd --device=/dev/dri \
   --group-add "$(stat -c %g /dev/kfd)" -p 127.0.0.1:8000:8000 \
   -v "$PWD/artifacts:/data/artifacts:ro" embeddinggemma2-rocm:local \
-  serve --bundle artifacts/my-gpu --host 0.0.0.0
+  serve --bundle artifacts/my-gpu-shared --host 0.0.0.0
 
 curl http://127.0.0.1:8000/v1/embeddings \
   -H 'Content-Type: application/json' \
@@ -82,6 +88,8 @@ curl http://127.0.0.1:8000/v1/embeddings \
 The publication matrix uses deterministic synthetic, prescaled **512×288 RGB (16:9)** inputs, token budgets **70/140/280**, and request batches **1/4/32/128**, where supported. A budget is an upper bound; the report records actual image tokens, sequence length, internal vision chunks, precision, and backend settings.
 
 Timing starts with CPU RGB arrays and ends with normalized FP32 embeddings on the CPU. It includes patch preprocessing, host/device transfers, and internal chunking. File decoding, upstream prescaling, model loading, compilation, and warmup are excluded. Native preprocessing uses fused half-pixel bilinear resizing and RGB scaling by 1/255; the PyTorch baseline uses the upstream bicubic antialiased processor. This preprocessing approximation is part of the native performance/quality tradeoff. These are direct library calls, without HTTP overhead. PyTorch and llama.cpp use the same inputs. Each backend runs in a separate process, with at least 3 warmups and 5 repeats in each of two reversed-order rounds.
+
+A separate HIP search now publishes a validated [gfx1150 budget-70/batch-1 recipe](profiles/gpus/gfx1150/budget70-b1.json) at **35.74 ms/image**. The publication matrix below remains the original measurement set; [new raw rounds](benchmarks/results/gfx1150-hip-tuned/) and [validation](docs/validation.md#shared-profiles-and-portable-hip-recipes) document the additional result.
 
 <!-- benchmark-table:start -->
 

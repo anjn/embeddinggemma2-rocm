@@ -22,6 +22,7 @@ COPY CMakeLists.txt LICENSE THIRD_PARTY_NOTICES.md THIRD_PARTY_LICENSES.txt ./
 COPY src/ src/
 COPY include/ include/
 COPY kernels/ kernels/
+COPY python/embeddinggemma2_rocm/_compiler/kernels/ python/embeddinggemma2_rocm/_compiler/kernels/
 COPY examples/ examples/
 COPY --from=tokenizer /src/tokenizer/target/release/libeg2_tokenizer.a /opt/eg2-tokenizer.a
 COPY --from=tokenizer /licenses/ /opt/eg2/share/licenses/tokenizer/
@@ -31,7 +32,8 @@ RUN cmake -S . -B /tmp/eg2-build -G Ninja \
     -DTORCH_ROOT=/opt/eg2-venv/lib/python3.12/site-packages/torch \
     -DEG2_GPU_ARCH=${GPU_ARCH} -DEG2_TOKENIZER_LIBRARY=/opt/eg2-tokenizer.a \
     && cmake --build /tmp/eg2-build -j 2 && cmake --install /tmp/eg2-build
-COPY pyproject.toml ./
+COPY pyproject.toml setup.py MANIFEST.in ./
+COPY profiles/ profiles/
 COPY python/ python/
 RUN pip install --no-cache-dir '.[prepare,server,bench,test]'
 ENV EG2_LIBRARY_PATH=/opt/eg2/lib/libeg2.so \

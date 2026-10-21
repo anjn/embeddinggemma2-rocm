@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "date": "2026-10-21",
+  "container_image": "sha256:b510ab99b59ec6f02d8739f8bd3ffc6a3e0000b7cc7c2e6d08446c044e73ec12",
+  "cpu_tests_passed": 35,
+  "c_and_cpp_shared_inference": true,
+  "http_shared_image_text_parity": true,
+  "cold_shared_start": true,
+  "shared_switches": 100,
+  "segmented_batch128_parity": true,
+  "segmented_batch128_within_five_percent": true,
+  "published_preset_reused_without_search": true,
+  "packaged_preset_source_digest_verified": true,
+  "worker_process_group_probe": true
+}

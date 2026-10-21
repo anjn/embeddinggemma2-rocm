@@ -156,3 +156,19 @@ def test_decoded_image_limit():
             },
         )
     assert response.status_code == 400
+
+
+def test_shared_bundle_prepared_before_ready():
+    class SharedFake(FakeEmbedder):
+        prepared = 0
+
+        @property
+        def capabilities(self):
+            return {"schema": 2, "profiles": []}
+
+        def prepare(self):
+            type(self).prepared += 1
+
+    with TestClient(create_app("/unused", embedder_factory=SharedFake)) as client:
+        assert SharedFake.prepared == 1
+        assert client.get("/ready").status_code == 200

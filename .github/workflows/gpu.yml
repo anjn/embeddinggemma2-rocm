@@ -5,6 +5,9 @@ on:
       bundle:
         description: Absolute prepared bundle path on a trusted self-hosted runner (including preparation references)
         required: true
+      shared_bundle:
+        description: Optional shared-schema bundle matching the original bundle (image/text batches 1 and 4)
+        required: false
       architecture:
         description: HIP architecture of the runner GPU
         default: gfx1150
@@ -20,11 +23,16 @@ jobs:
       - name: Native and HTTP verification
         env:
           BUNDLE: ${{ inputs.bundle }}
+          SHARED_BUNDLE: ${{ inputs.shared_bundle }}
         run: |
           mkdir -p artifacts/ci
+          shared_mount=()
+          if [[ -n "$SHARED_BUNDLE" ]]; then
+            shared_mount=(-v "$SHARED_BUNDLE:/data/shared:ro")
+          fi
           docker run --rm --device=/dev/kfd --device=/dev/dri \
             --group-add "$(stat -c %g /dev/kfd)" \
-            -v "$BUNDLE:/data/bundle:ro" -v "$PWD:/src:ro" \
+            "${shared_mount[@]}" -v "$BUNDLE:/data/bundle:ro" -v "$PWD:/src:ro" \
             -v "$PWD/artifacts/ci:/results" --entrypoint bash eg2-ci -e -c '
               /opt/eg2/bin/eg2-example /data/bundle 1
               /opt/eg2/bin/eg2-example-c /data/bundle
@@ -33,6 +41,12 @@ jobs:
               python /src/tests/tokenizer_parity.py --bundle /data/bundle --tokenizer /data/bundle/tokenizer.json
               python /src/tests/native_lifecycle.py --bundle /data/bundle
               python /src/tests/gpu_server.py --bundle /data/bundle
+              if [[ -d /data/shared ]]; then
+                /opt/eg2/bin/eg2-example /data/shared 1
+                /opt/eg2/bin/eg2-text-example /data/shared
+                python /src/tests/shared_profiles.py --original /data/bundle --shared /data/shared > /results/shared-profile-memory.json
+                python /src/tests/gpu_server.py --bundle /data/shared
+              fi
             '
       - uses: actions/upload-artifact@v4
         with:

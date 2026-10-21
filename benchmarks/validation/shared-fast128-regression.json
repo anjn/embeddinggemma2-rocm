@@ -1,0 +1,92 @@
+{
+  "parity_passed": true,
+  "budget": 70,
+  "batch": 128,
+  "unique_inputs": true,
+  "warmup": 3,
+  "repeat": 5,
+  "max_absolute_error": 0.0,
+  "min_cosine": 0.9999997615814209,
+  "shared_over_legacy_latency": 1.0079499724133167,
+  "within_five_percent": true,
+  "results": {
+    "legacy": {
+      "seconds": [
+        3.3903685889999906,
+        3.3947935410001264,
+        3.3951850579999245,
+        3.39921746899995,
+        3.3944249700000455
+      ],
+      "ms_per_image": 26.521824539063488,
+      "memory": {
+        "mode": "legacy"
+      },
+      "execution": {
+        "budget": 70,
+        "chunks": 1,
+        "execution_batch": 128,
+        "fingerprint": {
+          "device": "AMD Radeon 890M",
+          "gpu_arch": "gfx1150",
+          "migraphx": "2.15.0.dev+20250912-17-195-g1afd1b89c",
+          "model_revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+          "precision": "fast",
+          "recipe_revision": 3,
+          "rocm": "7.2.53211",
+          "torch": "2.14.1+rocm7.2"
+        },
+        "image_tokens": 66,
+        "modality": "image",
+        "requested_batch": 128,
+        "sequence": 70,
+        "vision_batch": 16,
+        "vision_kind": "segmented"
+      }
+    },
+    "shared": {
+      "seconds": [
+        3.4236650100001498,
+        3.5339010590000726,
+        3.4154076459999487,
+        3.4217820559999836,
+        3.4093512560000363
+      ],
+      "ms_per_image": 26.732672312499872,
+      "memory": {
+        "mode": "shared",
+        "profile_switches": 1,
+        "resident_image_profiles": 1,
+        "resident_text_modules": 0,
+        "resident_text_profiles": 0,
+        "rgb_capacity_bytes": 56623104,
+        "transient_allocated_bytes": 33554432,
+        "transient_reserved_bytes": 50331648,
+        "weight_allocations": 400,
+        "weight_bytes": 597711620,
+        "workspace_bytes": 11303773952
+      },
+      "execution": {
+        "budget": 70,
+        "chunks": 1,
+        "execution_batch": 128,
+        "fingerprint": {
+          "device": "AMD Radeon 890M",
+          "gpu_arch": "gfx1150",
+          "migraphx": "2.15.0.dev+20250912-17-195-g1afd1b89c",
+          "model_revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+          "precision": "fast",
+          "recipe_revision": 3,
+          "rocm": "7.2.53211",
+          "torch": "2.14.1+rocm7.2"
+        },
+        "image_tokens": 66,
+        "modality": "image",
+        "requested_batch": 128,
+        "sequence": 70,
+        "vision_batch": 16,
+        "vision_kind": "segmented"
+      }
+    }
+  }
+}

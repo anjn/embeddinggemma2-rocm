@@ -8,6 +8,9 @@
 
 Radeon 890M（gfx1150）には、token budget 70、アスペクト比16:9、Vision内部バッチ16用の高速化処理を用意しています。その他の形状には通常のコンパイル処理を使います。他のAMD GPUは未検証であり、使用するGPUでのコンパイルと検証が必要です。モデルとコンパイル済みデータは別途取得・生成します。
 
+
+`eg2 share`で、複数の画像・テキストプロファイル間で重みと最大サイズの作業領域を共有できます。HIPチューナーはプロファイルごとの設定を探索し、検証済みのGPU設定を`profiles/gpus/`へ保存できます。一致する環境では探索せずに再利用します。詳しくは[チューニングとメモリ共有](docs/tuning.ja.md)を参照してください。
+
 ## ビルドとモデルの準備
 
 コンテナーを使うにはLinux、対応AMD GPU、Docker、ホスト側のROCmドライバーが必要です。モデルの利用条件を確認し、必要なアクセス権を取得してください。認証が必要な場合は、シェルで`HF_TOKEN`を設定します。
@@ -29,6 +32,10 @@ docker run --rm --device=/dev/kfd --device=/dev/dri \
   -v "$PWD/models:/data/models:ro" -v "$PWD/artifacts:/data/artifacts" \
   embeddinggemma2-rocm:local prepare-text --model models/google \
   --output artifacts/my-gpu --batches 1 4 --lengths 32 128
+
+docker run --rm -v "$PWD/artifacts:/data/artifacts" \
+  embeddinggemma2-rocm:local share --bundle artifacts/my-gpu \
+  --output artifacts/my-gpu-shared
 ```
 
 準備には時間とGPUメモリーを要するため、小さいバッチから始めてください。コンパイル済みデータにはモデルの重みを含み、GPUとソフトウェア環境に依存します。gfx1150のbudget 70、batch 32/128ではVision内部バッチ16を選び、専用の高速化を試みます。グラフ構造の検査に失敗した場合は、ログに理由を記録し、通常のコンパイル結果を残します。
@@ -43,7 +50,7 @@ docker run --rm --device=/dev/kfd --device=/dev/dri \
 import numpy as np
 from embeddinggemma2_rocm import Embedder
 
-with Embedder("artifacts/my-gpu") as model:
+with Embedder("artifacts/my-gpu-shared") as model:
     images = np.zeros((4, 288, 512, 3), dtype=np.uint8)
     image_vectors = model.encode_images(images, token_budget=70)
     text_vectors = model.encode_texts(["猫", "街並み"], prompt="query")
@@ -61,7 +68,7 @@ C/C++では[公開ヘッダー](include/eg2/eg2.h)と[使用例](examples/)を�
 docker run --rm --device=/dev/kfd --device=/dev/dri \
   --group-add "$(stat -c %g /dev/kfd)" -p 127.0.0.1:8000:8000 \
   -v "$PWD/artifacts:/data/artifacts:ro" embeddinggemma2-rocm:local \
-  serve --bundle artifacts/my-gpu --host 0.0.0.0
+  serve --bundle artifacts/my-gpu-shared --host 0.0.0.0
 
 curl http://127.0.0.1:8000/v1/embeddings \
   -H 'Content-Type: application/json' \
@@ -75,6 +82,8 @@ curl http://127.0.0.1:8000/v1/embeddings \
 比較条件は、固定seedで生成した512×288の16:9 RGB入力、token budget 70/140/280、要求batch 1/4/32/128です。対応する組み合わせを測定します。budgetは上限であり、実際の画像トークン数、系列長、内部バッチ、精度、バックエンド設定を測定結果に記録します。
 
 CPU上のRGB配列を受け取ってから、正規化済みFP32埋め込みをCPUへ返すまでを計測します。パッチ前処理とCPU/GPU間転送を含み、ファイルのデコード、事前リサイズ、モデル読み込み、コンパイル、ウォームアップを除きます。ネイティブ側は半ピクセル座標のバイリニア補間と1/255スケーリングを統合し、PyTorch側は元のバイキュービック・アンチエイリアス処理を使います。この前処理の近似も、速度と検索精度の評価対象に含めます。HTTPを介さず、各ライブラリを直接呼び出します。バックエンドごとにプロセスを分け、実行順と逆順の各ラウンドで3回以上のウォームアップと5回以上の測定を行います。
+
+追加のHIP探索で、budget 70・batch 1の**35.74 ms/画像**の[検証済み設定](profiles/gpus/gfx1150/budget70-b1.json)を保存しました。以下の比較表は従来の測定セットを維持し、追加分の[測定記録](benchmarks/results/gfx1150-hip-tuned/)と[検証結果](docs/validation.ja.md)を別に示しています。
 
 <!-- benchmark-table:start -->
 

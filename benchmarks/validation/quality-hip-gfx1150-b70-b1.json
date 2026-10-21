@@ -1,0 +1,147 @@
+{
+  "schema": 1,
+  "bundle_sha256": "7ce5871cf730eef6fac932055dbdffa962a6aa2114b14dad470357214cd423b9",
+  "bundle": "validated gfx1150 budget70 batch1 tuning candidate",
+  "input_sha256": "62f0a0c9c7ef269a52ee440c48ee2a0d3f37facbd01761bf08d6874ff4ea5d02",
+  "manifest_sha256": "3d3aced14affedefb32c3a15387335c82f779352a4fa34cb232081035c5f2c6c",
+  "images": 256,
+  "captions": 1280,
+  "budget": 70,
+  "requested_batch": 1,
+  "image_execution": {
+    "budget": 70,
+    "chunks": 1,
+    "execution_batch": 1,
+    "fingerprint": {
+      "device": "AMD Radeon 890M",
+      "gpu_arch": "gfx1150",
+      "kernel_config": {
+        "gelu": {
+          "block": 128,
+          "vector": 4
+        },
+        "norm": null,
+        "preprocess": null,
+        "qk": {
+          "block": 128,
+          "lanes": 16,
+          "packed": true
+        },
+        "segmented": false
+      },
+      "migraphx": "2.15.0.dev+20250912-17-195-g1afd1b89c",
+      "model_revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+      "precision": "fast",
+      "recipe_revision": 4,
+      "recipe_sha256": "a996704001c373656b1b6e6f6f5e27778611562c29b2f285a17328509ed8c102",
+      "rocm": "7.2.53211",
+      "torch": "2.14.1+rocm7.2"
+    },
+    "image_tokens": 66,
+    "modality": "image",
+    "requested_batch": 1,
+    "sequence": 70,
+    "vision_batch": 1,
+    "vision_kind": "compiled"
+  },
+  "reference": {
+    "text_to_image": 86.25,
+    "image_to_text": 94.140625
+  },
+  "candidate": {
+    "text_to_image": 86.484375,
+    "image_to_text": 93.359375
+  },
+  "loss_percentage_points": {
+    "text_to_image": -0.234375,
+    "image_to_text": 0.78125
+  },
+  "min_cosine_to_fp32": {
+    "images": 0.9852911829948425,
+    "texts": 0.9999997615814209
+  },
+  "criterion": "Both retrieval R@1 losses are at most 1.0 percentage point",
+  "passed": true,
+  "capabilities": {
+    "device_memory": {
+      "free_bytes": 9058639872,
+      "scope": "whole device, including other processes",
+      "total_bytes": 25769803776
+    },
+    "gpu": {
+      "arch": "gfx1150",
+      "name": "AMD Radeon 890M"
+    },
+    "hip_runtime_version": 70253211,
+    "last_execution": {
+      "chunks": 1,
+      "execution_batch": 1,
+      "modality": "text",
+      "requested_batch": 1,
+      "sequence": 32
+    },
+    "memory": {
+      "mode": "legacy"
+    },
+    "model": "google/embeddinggemma-2",
+    "profiles": [
+      {
+        "aspect": [
+          16,
+          9
+        ],
+        "batch": 1,
+        "budget": 70,
+        "path": "gfx1150-budget70-b1-aspect16x9-fast-v1-r4-2584904687dd",
+        "precision": "fast"
+      }
+    ],
+    "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+    "schema": 1,
+    "text_profiles": [
+      {
+        "batch": 1,
+        "kind": "torchscript",
+        "path": "text-standard-v5.pt",
+        "precision": "standard",
+        "sequence": 32
+      },
+      {
+        "batch": 1,
+        "kind": "torchscript",
+        "path": "text-standard-v5.pt",
+        "precision": "standard",
+        "sequence": 128
+      },
+      {
+        "batch": 1,
+        "kind": "torchscript",
+        "path": "text-standard-v5.pt",
+        "precision": "standard",
+        "sequence": 512
+      },
+      {
+        "batch": 4,
+        "kind": "torchscript",
+        "path": "text-standard-v5.pt",
+        "precision": "standard",
+        "sequence": 32
+      },
+      {
+        "batch": 4,
+        "kind": "torchscript",
+        "path": "text-standard-v5.pt",
+        "precision": "standard",
+        "sequence": 128
+      },
+      {
+        "batch": 4,
+        "kind": "torchscript",
+        "path": "text-standard-v5.pt",
+        "precision": "standard",
+        "sequence": 512
+      }
+    ],
+    "tokenizer": "tokenizer.json"
+  }
+}

@@ -23,10 +23,19 @@ def main(argv=None):
             c.add_argument("--budgets", nargs="+", type=int, default=[70, 140, 280])
             c.add_argument("--aspect", nargs=2, type=int, default=[16, 9])
             c.add_argument("--vision-batch", type=int)
+            c.add_argument("--tuning-profile")
+            c.add_argument("--no-presets", action="store_true")
         else:
             c.add_argument(
                 "--lengths", nargs="+", type=int, default=[32, 128, 512, 2048, 8192]
             )
+    c = sub.add_parser("export-tuning")
+    c.add_argument("--profile", required=True)
+    c.add_argument("--quality", required=True)
+    c.add_argument("--output", required=True)
+    c = sub.add_parser("share")
+    c.add_argument("--bundle", required=True)
+    c.add_argument("--output", required=True)
     c = sub.add_parser("info")
     c.add_argument("--bundle", required=True)
     c.add_argument("--device", type=int, default=0)
@@ -58,6 +67,8 @@ def main(argv=None):
     )
     c.add_argument("--flash", choices=["on", "off"], default="on")
     c.add_argument("--vision-batch", type=int)
+    c.add_argument("--verify-reversal", action="store_true")
+    c.add_argument("--unique-images", action="store_true")
     c = sub.add_parser("tune")
     c.add_argument("--model", required=True)
     c.add_argument("--output", required=True)
@@ -65,6 +76,8 @@ def main(argv=None):
     c.add_argument("--batch", type=int, choices=[1, 4, 32, 128], default=128)
     c.add_argument("--vision-batches", nargs="+", type=int, default=[1, 4, 8, 16, 32])
     c.add_argument("--repeat", type=int, default=5)
+    c.add_argument("--resume", help="Resume an existing tuning session directory")
+    c.add_argument("--cache-dir", action="append", default=[])
     a = p.parse_args(argv)
     if a.command == "fetch":
         from .preparation import fetch_model
@@ -89,10 +102,20 @@ def main(argv=None):
                     tuple(a.aspect),
                     a.precision,
                     a.vision_batch,
+                    tuning_profile=a.tuning_profile,
+                    use_presets=not a.no_presets,
                 )
             )
         else:
             print(prepare_text(a.model, a.output, a.batches, a.lengths, a.precision))
+    elif a.command == "export-tuning":
+        from .presets import export_recipe
+
+        print(export_recipe(a.profile, a.quality, a.output))
+    elif a.command == "share":
+        from .shared import share_bundle
+
+        print(share_bundle(a.bundle, a.output))
     elif a.command == "info":
         from .runtime import Embedder
 

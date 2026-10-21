@@ -5,11 +5,12 @@ from pathlib import Path
 
 p = argparse.ArgumentParser()
 p.add_argument("--batch", type=int, default=16)
-p.add_argument("--block", type=int, choices=(64, 128, 256), default=256)
+p.add_argument("--block", type=int, choices=(64, 128, 256, 512), default=256)
 p.add_argument("--source", required=True)
 p.add_argument("--binary", required=True)
 p.add_argument("--output", required=True)
 p.add_argument("--proof")
+p.add_argument("--patches", type=int, default=594)
 a = p.parse_args()
 source = Path(a.source)
 binary = Path(a.binary)
@@ -25,16 +26,17 @@ for n in v["modules"]["main"]["nodes"]:
         continue
     op = n["operator"]
     assert op["output_arg"] == -1 and len(op["expected_inputs"]) == 5
-    assert op["output"]["lens"] == [a.batch, 594, 12, 64] and op["output"][
+    assert op["output"]["lens"] == [a.batch, a.patches, 12, 64] and op["output"][
         "strides"
-    ] == [456192, 768, 64, 1]
-    assert op["expected_inputs"][0]["strides"] == [1368576, 2304, 64, 1]
+    ] == [a.patches * 768, 768, 64, 1]
+    assert op["expected_inputs"][0]["strides"] == [a.patches * 2304, 2304, 64, 1]
     assert op["expected_inputs"][1]["type"] == "float_type" and op["expected_inputs"][
         1
     ]["strides"] == [0, 0, 0, 1]
-    assert all(s["strides"] == [38016, 64, 0, 1] for s in op["expected_inputs"][2:4])
-    assert op["global"] == a.batch * 594 * 12 * 16 and op["global"] % a.block == 0
-    op.update(code_object=code, symbol_name="hip_norm_rope_packed4", local=a.block)
+    assert all(s["strides"] == [a.patches * 64, 64, 0, 1] for s in op["expected_inputs"][2:4])
+    assert op["global"] >= a.batch * a.patches * 12 * 16
+    op.update(code_object=code, symbol_name="hip_norm_rope_packed4", local=a.block,
+        **{"global": ((a.batch*a.patches*12*16+a.block-1)//a.block)*a.block})
     count += 1
 assert count == 32
 target = Path(a.output)
