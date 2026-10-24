@@ -10,6 +10,10 @@ The specialized image recipe targets Radeon 890M (`gfx1150`), budget 70, 16:9 im
 
 Multiple image and text profiles can share GPU weights and a maximum-size workspace with `eg2 share`. The HIP tuner searches per-profile kernel settings and can publish validated GPU recipes under `profiles/gpus/`; compatible machines reuse settings without a search. See [tuning and shared profiles](docs/tuning.md).
 
+## MobileCLIP2-S2
+
+An additional native API provides 512D image/text embeddings: MIGraphX FP16 image inference supports batch 1 and 4; Ryzen AI SW 1.9 BF16 supports batch 1. Text runs on CPU FP32. Use `MobileCLIP2Embedder` in Python or `libmobileclip2` from C/C++. See [preparation, build and API examples](docs/mobileclip2.md). The embeddings use a separate index from EmbeddingGemma; existing APIs are unchanged.
+
 ## Build and prepare
 
 Linux, a supported AMD GPU, Docker, and a working ROCm host driver are required for the container workflow. Obtain access to the model and accept its upstream terms before downloading it. Set `HF_TOKEN` in the shell if authentication is required.

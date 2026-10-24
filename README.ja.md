@@ -11,6 +11,10 @@ Radeon 890M（gfx1150）には、token budget 70、アスペクト比16:9、Visi
 
 `eg2 share`で、複数の画像・テキストプロファイル間で重みと最大サイズの作業領域を共有できます。HIPチューナーはプロファイルごとの設定を探索し、検証済みのGPU設定を`profiles/gpus/`へ保存できます。一致する環境では探索せずに再利用します。詳しくは[チューニングとメモリ共有](docs/tuning.ja.md)を参照してください。
 
+## MobileCLIP2-S2
+
+MobileCLIP2-S2の画像・テキストを512次元ベクトルに変換するAPIも利用できます。画像はMIGraphX FP16でbatch 1・4、Ryzen AI SW 1.9 BF16でbatch 1に対応します。テキストはCPU FP32で実行します。Pythonでは`MobileCLIP2Embedder`、C/C++では`libmobileclip2`を使います。[準備・ビルド・利用例](docs/mobileclip2.md)を参照してください。検索インデックスはEmbeddingGemmaとは別に作成してください。
+
 ## ビルドとモデルの準備
 
 コンテナーを使うにはLinux、対応AMD GPU、Docker、ホスト側のROCmドライバーが必要です。モデルの利用条件を確認し、必要なアクセス権を取得してください。認証が必要な場合は、シェルで`HF_TOKEN`を設定します。

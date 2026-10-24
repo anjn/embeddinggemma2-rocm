@@ -1,1 +1,12 @@
 recursive-include profiles *.json *.md
+
+include CMakeLists.txt
+recursive-include cmake *.cmake
+recursive-include include *.h *.hpp
+recursive-include src *.cpp
+recursive-include examples *.c *.cpp *.py
+include tokenizer/Cargo.toml tokenizer/Cargo.lock
+recursive-include tokenizer/src *.rs
+recursive-include kernels *.hip *.cpp
+recursive-include docs *.md
+recursive-include tests *.py

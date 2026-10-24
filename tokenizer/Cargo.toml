@@ -7,3 +7,4 @@ license = "MIT"
 crate-type = ["staticlib"]
 [dependencies]
 tokenizers = { version = "=0.22.1", default-features = false, features = ["onig"] }
+html-escape = "=0.2.13"

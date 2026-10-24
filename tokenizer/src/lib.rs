@@ -103,3 +103,50 @@ pub unsafe extern "C" fn eg2_tokenizer_encode(
         }
     }
 }
+
+// MobileCLIP uses a separate exported tokenizer, with truncation and fixed padding.
+#[no_mangle]
+pub unsafe extern "C" fn mc2_tokenizer_encode(
+    t: *const Tokenizer,
+    texts: *const *const c_char,
+    count: usize,
+    ids: *mut i64,
+    err: *mut c_char,
+    cap: usize,
+) -> i32 {
+    let result = catch_unwind(AssertUnwindSafe(|| -> Result<(), String> {
+        if t.is_null() || texts.is_null() || ids.is_null() {
+            return Err("Null tokenizer argument".into());
+        }
+        for i in 0..count {
+            let raw = *texts.add(i);
+            if raw.is_null() {
+                return Err("Null text".into());
+            }
+            let text = CStr::from_ptr(raw).to_str().map_err(|e| e.to_string())?;
+            let once = html_escape::decode_html_entities(text);
+            let clean = html_escape::decode_html_entities(&once);
+            let enc = (*t)
+                .encode(clean.as_ref(), true)
+                .map_err(|e| e.to_string())?;
+            if enc.get_ids().len() != 77 {
+                return Err("Invalid MobileCLIP tokenizer: expected 77 tokens".into());
+            }
+            for (j, id) in enc.get_ids().iter().enumerate() {
+                *ids.add(i * 77 + j) = *id as i64;
+            }
+        }
+        Ok(())
+    }));
+    match result {
+        Ok(Ok(())) => 0,
+        Ok(Err(e)) => {
+            error(err, cap, &e);
+            1
+        }
+        Err(_) => {
+            error(err, cap, "Tokenizer panic");
+            2
+        }
+    }
+}
